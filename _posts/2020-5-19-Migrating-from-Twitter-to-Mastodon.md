@@ -5,7 +5,7 @@ title: Migrating from Twitter to Mastodon
 # What is Mastodon?
 Straight from their main page: "Mastodon is an open source decentralized social network", 
 so it's basically the project [Bluesky](https://twitter.com/bluesky) but already implemented 
-(Without the ads yay). Basically, it's a bunch of small (compared to the whole thing) independent 
+(Without the ads yay). More specifically, it's a bunch of small (compared to the whole thing) independent 
 communities which can interact with each other. You can find more information about Mastodon and 
 how it works in the [documentation](https://docs.joinmastodon.org/).
 
