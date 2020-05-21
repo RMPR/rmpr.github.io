@@ -23,7 +23,14 @@ it to their taste.
 # Libraries used
 - [pyautogui](https://github.com/asweigart/pyautogui) : Used for the replay feature
 - [pynput](https://github.com/moses-palmer/pynput): to record user input
-PyInstaller: to bundles the application into a single package
-poetry: to publish on PyPI
-wxPython: for the GUI
+- [PyInstaller](https://github.com/pyinstaller/pyinstaller): to bundles the application into a single package
+- [poetry](https://github.com/python-poetry/poetry): to publish on PyPI
+- [wxPython](https://github.com/wxWidgets/Phoenix/): for the GUI
+
+# Final words
+atbswp is pretty usable as it is. Although this is a pre-alpha release, it's stable enough to be used daily, I use it to automate various task and almost all of my demos.
+
+If you want up to date news about atbswp, [follow me on Mastodon](https://hostux.social/@rmpr) to be notified about releases and blog posts like this, or you can join the 
+community on [Telegram](https://t.me/atbswp), atbswp's [source code](https://github.com/rmpr/atbswp) is available on Github, you can try it now.
+
 
