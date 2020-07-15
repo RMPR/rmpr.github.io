@@ -36,7 +36,7 @@ After that, you can verify everything is good with:
 transmission-remote -l
 ```
 
-# Keep track of what's happening
+## Keep track of what's happening
 This is were tmux will be helpful, if you don't know what is tmux, [here](https://opensource.com/article/17/2/quick-introduction-tmux) is a quick introduction, for now you just have to launch tmux, then run the command:
 ```
 watch "transmission-remote -l" (add the -n flag to specify an interval, the standard is 2 seconds)
@@ -44,6 +44,6 @@ watch "transmission-remote -l" (add the -n flag to specify an interval, the stan
 Then Ctrl-B + % to divide the screen and you can now operate on transmisison as you wish, and you'll no longer have observability problems
 ![Tmux and transmission daemon](../images/tmux-transmission.png)
 
-# Rounding edges
+## Rounding edges
 You might experience connection slow down when launching torrents, it's because the torrent protocol is extremely 
 efficient at maxing out your connection, so it uses all available resources to get the job done quicker. To "fix" that, you can limit download and upload speeds in  ~/.config/transmission/settings.json
