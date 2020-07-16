@@ -16,7 +16,7 @@ the transmission process and restart it after each reboot.
 sudo kill $(pgrep transmission) && transmission-daemon 
 ```
 
-## Dowmloading torrents
+## Downloading torrents
 
 The cli is pretty straightforward, when I mention CLI, I talk about transmission-remote, not transmission-cli. 
 beware of using transmission-cli though, it has been deprecated in favor of transmission-remote, and it's less handy because it runs as a foreground process, so when you launch your torrents with transmission-cli, unless you 
