@@ -14,6 +14,10 @@ the transmission process and restart it after each reboot.
 
 `sudo kill $(pgrep transmission) && transmission-daemon`
 
+or a shorter version:
+
+`sudo pkill transmisison && transmission-daemon`
+
 ## Downloading torrents
 
 The cli is pretty straightforward, when I mention CLI, I talk about transmission-remote, not transmission-cli. 
