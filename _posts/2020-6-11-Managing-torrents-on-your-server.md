@@ -14,15 +14,19 @@ the transmission process and restart it after each reboot.
 
 `sudo kill $(pgrep transmission) && transmission-daemon`
 
-or a shorter version:
+or better versions suggested in the comments on Lobsters:
 
-`sudo pkill transmisison && transmission-daemon`
+`sudo pkill transmission && transmission-daemon`
+
+To give it a chance to quit gracefully:
+
+`sudo pkill -INT transmission && transmission-daemon`
 
 ## Downloading torrents
 
-The cli is pretty straightforward, when I mention CLI, I talk about transmission-remote, not transmission-cli. 
+The CLI is pretty straightforward, when I mention CLI, I talk about transmission-remote, not transmission-cli. 
 beware of using transmission-cli though, it has been deprecated in favor of transmission-remote, and it's less handy because it runs as a foreground process, so when you launch your torrents with transmission-cli, unless you 
-add the ampersand (&) it will lock the current terminal (which is far from ideal if you're using ssh). The simple and modern command to add a new torrent is:
+add the ampersand (&) it will lock the current terminal (which is far from ideal if you're using ssh), plus you have no way of getting the state of all your downloads at once. The simple and modern command to add a new torrent is:
 
 `transmission-remote -a /path/to/torrent/file`
 
@@ -41,7 +45,7 @@ This is where tmux will be helpful, if you don't know what is tmux, [here](https
 
 `watch "transmission-remote -l" (add the -n flag to specify an interval, the standard is 2 seconds)`
 
-Then Ctrl-B + % to divide the screen and you can now operate on transmisison as you wish, and you'll no longer have observability problems
+Then Ctrl-B + % to divide the screen and you can now operate on transmission as you wish, and you'll no longer have observability problems
 ![Tmux and transmission daemon](../images/tmux-transmission.png)
 
 ## Rounding edges
