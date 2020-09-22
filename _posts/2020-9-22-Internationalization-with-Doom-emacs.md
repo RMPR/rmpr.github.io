@@ -14,7 +14,7 @@ That said, I obviously directly wanted to include
 this in my org-mode workflow with Doom Emacs, don't ask me why I use both (Neo)vim 
 and (Doom)emacs, it turns out that choosing an editor is a more complex task than 
 what it seems in the first place... but I digress. What a surprise when I tried  
-<C-K> and it jumped to the parent tree instead of showing the "right" behaviour, a quick look at the 
+`<C-K>` and it jumped to the parent tree instead of showing the "right" behaviour, a quick look at the 
 [evil's symbols definition](https://github.com/emacs-evil/evil/blob/3f3b2fea87172f155e5f91d75f0fb69d8648acf2/evil-maps.el#L369) 
 shows that it's obviously not the culprit, moreover the feature seems to work 
 everywhere except in org-mode... Hmmmh doom-emacs what are you up to? Seems like 
