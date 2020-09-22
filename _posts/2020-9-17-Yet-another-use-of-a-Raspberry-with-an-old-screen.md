@@ -21,7 +21,7 @@ Now all you have to do is `mpv <video_address>`.
 To prevent the session to be terminated if there something wrong with the 
 network, one solution is to use `tmux`, and by adding:
 
-```
+```bash
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
     tmux attach -t default || tmux new -s default
 fi
