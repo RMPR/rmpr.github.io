@@ -5,11 +5,13 @@ title: Running an external command on content of a register in Vim
 
 While working on a [side project](https://github.com/rmpr/atbswp) I faced a really annoying problem, run a
 snippet of code to figure out what it does, or just to tinker a bit, without using it whatsoever, and while I don't think there is a
-straightforward way to do this, except [this long answer](https://vi.stackexchange.com/questions/21284/running-external-command-on-contents-of-register)
-I share here a simple trick: rely on your temporary folder, after all that's what the Unix philosophy is about
+straightforward way to do this, except [using System](https://vi.stackexchange.com/questions/21284/running-external-command-on-contents-of-register)
+I share here a simple trick. 
+
+Rely on your temporary folder, after all that's what the Unix philosophy is about: 
 composing tools to achieve what you want... So you start by creating a file in /tmp, I call it /tmp/temp.py
 (add the extension because I defined some stuff that load when a Python file is detected see my
-[dotfile](https://github.com/rmpr/dotfiles))
+[dotfiles](https://github.com/rmpr/dotfiles))
 ```
 :e /tmp/temp.py
 ```

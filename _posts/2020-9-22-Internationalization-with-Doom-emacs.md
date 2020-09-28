@@ -8,7 +8,7 @@ found it to be a blessing, because I write in many languages on a daily basis
 (mainly French, English and Spanish), and changing keyboard layouts is very painful 
 for the brain, and everybody knows that the QWERTY layout is superior for Vim, even 
 [Theprimeagen](https://youtu.be/tCktGgPQ3D0?t=1435) (yes this was an actual talk 
-at the Vimconf 2020) says so, but I absolutedly hate the international US Layout.
+at the Vimconf 2020) says so, but I absolutely hate the international US Layout.
 
 That said, I obviously directly wanted to include 
 this in my org-mode workflow with Doom Emacs, don't ask me why I use both (Neo)vim 
