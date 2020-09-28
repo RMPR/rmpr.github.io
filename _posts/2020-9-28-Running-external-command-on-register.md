@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Running an external command on content of a register in Vim
+title: Running an external command on the content of a register in Vim
 ---
 
 While working on a [side project](https://github.com/rmpr/atbswp) I faced a really annoying problem, run a
