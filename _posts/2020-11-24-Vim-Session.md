@@ -15,4 +15,5 @@ P.S.
 
 In almost one year of Vim usage, I always wanted to do this, but somehow tutorials address mostly plugins installation and usage. No, I want the real, rough Vim, please.
 
+[![Vim sessions](../images/sessions.gif)](https://www.youtube.com/watch?v=jPPozzOCyIw)
 
