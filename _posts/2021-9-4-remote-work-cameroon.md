@@ -11,7 +11,7 @@ what worked and not for me.  Before I forget, this is mainly for people like me 
 computer science for the sake of doing it. Not because someone forced us or
 whatever. In short, geeks I guess. If you&rsquo;re like me the perspective of spam
 applying and writing corresponding CVs is not very appealing. So, if CS is just
-a mean to an end - not that there&rsquo;s something wrong with that -  but this might
+a means to an end - not that there&rsquo;s something wrong with that -  but this might
 rub you off the wrong way (and you guessed right, no, I don&rsquo;t look forward to
 enter management to &ldquo;escape&rdquo; coding). The job landscape in Cameroon is&#x2026;
 saddening. While everywhere else the supply exceeds the demand, here it's the
@@ -138,7 +138,7 @@ Here are some stuff that came to my mind in no particular order:
     people will be more than happy to help you.
 
 -   **Get a good Internet with good backup plans (in case of Eneo you know)**
-    This one is pretty obvious, but I just wanted to say that `Camtel` Blue is the
+    This one is pretty obvious, but I just wanted to say that ~~Camtel~~ Blue is the
     best consumer ISP.
 
 -   **If you absolutely have to write a cover letter write your own instead of copy-pasting a template**
