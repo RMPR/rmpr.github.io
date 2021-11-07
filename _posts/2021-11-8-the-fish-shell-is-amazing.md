@@ -54,7 +54,8 @@ previous scripts to work at all. The syntax is different, and arguably better.
 For example the for loop:
 
 with fish:
-```fish
+
+```bash
 for i in *.pdf
     echo $i
 end
