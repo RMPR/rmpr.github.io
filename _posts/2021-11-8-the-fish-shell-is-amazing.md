@@ -6,7 +6,7 @@ title: The fish shell is amazing
 
 I&rsquo;ve been lurking the [fish shell](https://fishshell.com/) for a couple of years now (and the
 [nushell](<https://github.com/nushell/nushell>) but it is another story for
-another time). Not so long ago, I decided to try it, and it&rsquo;s simply... amazing. If I had to state one feature that make me like to use it, it&rsquo;ll be the
+another time). Not so long ago, I decided to try it, and it&rsquo;s simply... amazing. If I had to state one feature that makes me like to use it, it&rsquo;ll be the
 autocompletion, hands down. It&rsquo;s the first time I just take a shell and without customization it&rsquo;s pleasing to use.
 
 
@@ -20,7 +20,8 @@ Some notable features I want to mention:
 contextual, depending on where you are, it suggests different things.
 
 -   Floating point calculation directly inside the shell, not super important, but I used to use a REPL or bc for that
--   You can configure your shell using a web interface! just run `fish_config`
+
+-   You can configure your shell using a web interface! Just run `fish_config`
 
 
 ## What about Plugins?
@@ -28,8 +29,9 @@ contextual, depending on where you are, it suggests different things.
 On my previous shells I used [bash-it](<https://github.com/bash-it/bash-it/>)
 and [oh-my-zsh](<https://github.com/ohmyzsh/ohmyzsh>). While those are amazing
 projects, they still need configuration to get things to work really well. And 
-if you want to match fish's level, you will need to install a lot of plugin or
-write quite a few lines of code. With fish there are some plugins manager,
+if you want to match fish's level, you will need to install a lot of plugin and/or
+write quite a few lines of code. With fish you get that for free. 
+Nevertheless, there are some plugins manager,
 [oh-my-fish](<https://github.com/oh-my-fish>),
 [fisher](<https://github.com/jorgebucaran/fisher>) and
 [Fundle](<https://github.com/danhper/fundle>). To be honest, I didn&rsquo;t
@@ -79,13 +81,13 @@ if you have issues activating Python virtual environments, you can have a look a
 
 ## Closing thoughts
 
-In my opinion, fish is not geared toward shell scripting, it&rsquo;s interactivity
-is simply unmatched in any current Shells that I know of. If you are more interested in a better shell scripting
-experience, you might want to have a look at the [Oil Shell](<https://www.oilshell.org/>) instead.
+In my opinion, fish is not geared towards shell scripting, it&rsquo;s interactivity
+is simply unmatched in any current shells that I know of. If you are more interested in a better shell scripting
+experience, you might want to have a look at the [oil shell](<https://www.oilshell.org/>) instead.
 Don&rsquo;t get me wrong, you still need to learn bash at a decent level as it is
 what you&rsquo;ll probably stumble upon the most (in containers, virtual environments,
 vanilla servers, &#x2026;), but this shouldn&rsquo;t prevent you from stepping up your game.
-If you liked this post check out this [awesome piece](<https://jvns.ca/blog/2017/04/23/the-fish-shell-is-awesome/>) by Julia Evans.
+If you liked this post, check out this [awesome piece](<https://jvns.ca/blog/2017/04/23/the-fish-shell-is-awesome/>) by Julia Evans.
 This is the first article of the serie about mouseless computing, I felt like it&rsquo;s kinda useful to have this as an entry point. Stay tuned for the next one.
 
 
