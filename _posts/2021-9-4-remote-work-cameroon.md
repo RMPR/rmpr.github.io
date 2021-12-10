@@ -62,7 +62,7 @@ note two things: first, He is in control, not only choosing the type of work (re
 also the location (France) and people already share some jobs with him in the comments.
 To finally [get a job less than a month later](<https://twitter.com/fasterthanlime/status/1301237794828963841>). This
 was so inspirational. Usually, I am not a social networks type of guy, but I&rsquo;ve come to tolerate some of them
-with time. By the way, you can find me on [Twitter](<https://twitter.com/Mairo_Rufus>) and [Linkedin](<https://www.linkedin.com/in/mpr/>) mostly.
+with time. By the way, you can find me on [Twitter](<https://twitter.com/rufusmairo>) and [Linkedin](<https://www.linkedin.com/in/mpr/>) mostly.
 Now if you are not famous (whatever that means) here are a couple of things you can try to &ldquo;fake&rdquo; it:
 
 -   Share your profile on the monthly &ldquo;Who wants to be hired&rdquo; thread on Hackernews
