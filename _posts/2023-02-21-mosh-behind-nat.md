@@ -5,17 +5,16 @@ title: Connect to a server behind a NAT using mosh
 
 If you're not familiar with [mosh](https://mosh.org/) it's essentially SSH but
 with support for roaming and it works like a charm on slow connections. I
-wanted to access my server which is behind a NAT, but with the current configs
+wanted to access my server which is behind a NAT, but with the default config
 it was not straightforward to do so. When you first launch mosh, sshd is launched
 in the background then kills the connection, in order to circumvent that, edit the ssh
-daemon config file: `/etc/ssh/sshd/config`and modify to add your port line:
+daemon config file: `/etc/ssh/sshd/config` to add the port you want to connect to:
 
 ```sh
 Port #PORTNUMBER
 ```
 
-If you want to change the port on a distribution with SELinux enabled, you have to tell SELinux
-about this change.
+If you have SELinux enabled, you have to tell SELinux about this change.
 
 ```sh
 semanage port -a -t ssh_port_t -p tcp #PORTNUMBER
