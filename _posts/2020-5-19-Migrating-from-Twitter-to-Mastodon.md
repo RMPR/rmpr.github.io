@@ -68,3 +68,7 @@ ActivityPub protocol (among others, but currently the most widely adopted). Othe
 social protocols can also communicate with ActivityPub projects. All together, they're 
 forming the [Fediverse](https://fediverse.party/) = "Federation" + "universe"
 
+Edit 2023-02-25
+
+You may want to checkout [Fedifinder](https://fedifinder.glitch.me/) to import your Twitter network
+to Mastodon at once.
