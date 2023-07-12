@@ -178,4 +178,9 @@ The key is information and speed. Follow the good persons, maybe build an audien
 I leave you with something I found to be true every single damn time:
 Finding a job is more a social activity than a technical one.
 
+Edit (Wed Jul 12 11:27:51 PM CEST 2023):
 
+With stackoverflow [sunsetting jobs and developer
+story](https://meta.stackoverflow.com/questions/415293/sunsetting-jobs-developer-story),
+my new recommendation is [levels.fyi's job board](https://www.levels.fyi/jobs). Add your
+compensation there too, they are great.
