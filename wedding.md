@@ -4,4 +4,4 @@ title: Wedding
 permalink: /wedding/
 ---
 
-Test 
+![qrcode](../images/redirect.png)
