@@ -24,7 +24,7 @@ jobs:
         uses: 'joschi/blueskyfeedbot@v1'
         with:
           # This is the RSS feed you want to publish
-          rss-feed: https://www.githubstatus.com/history.rss
+          rss-feed: https://rmpr.xyz/feed.xml
           # Template of status posted to Bluesky (Handlebars)
           template: |
             {{item.title}}
