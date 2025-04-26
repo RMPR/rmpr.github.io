@@ -1,0 +1,42 @@
+name: FeedBot
+on:
+  push:
+  workflow_dispatch: # This allows manually running the workflow from the GitHub actions page
+concurrency:
+  group: feedbot
+jobs:
+  rss-to-bluesky:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate cache key
+        uses: actions/github-script@v6
+        id: generate-key
+        with:
+          script: |
+            core.setOutput('cache-key', new Date().valueOf())
+      - name: Retrieve cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}/blueskyfeedbot
+          key: feed-cache-${{ steps.generate-key.outputs.cache-key }}
+          restore-keys: feed-cache-
+      - name: GitHub
+        uses: 'joschi/blueskyfeedbot@v1'
+        with:
+          # This is the RSS feed you want to publish
+          rss-feed: https://www.githubstatus.com/history.rss
+          # Template of status posted to Bluesky (Handlebars)
+          template: |
+            {{item.title}}
+
+            {{item.link}}
+          # This is your service URL (optional)
+          service-url: https://bsky.social
+          # This is the Bluesky username (example: username.bsky.social)
+          username: ${{ secrets.BLUESKY_USERNAME }}
+          # This is the app password you created earlier
+          password: ${{ secrets.BLUESKY_PASSWORD }}
+          # This is a path to the cache file, using the above cache path
+          cache-file: ${{ github.workspace }}/blueskyfeedbot/cache.json
+          # The maximum number of posts created on the first run
+          initial-post-limit: 10
