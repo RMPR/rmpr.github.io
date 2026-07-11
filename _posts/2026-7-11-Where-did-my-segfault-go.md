@@ -3,8 +3,6 @@ layout: post
 title: Where did my segfault go?
 ---
 
-# The problem
-
 The other day I was iterating on a small C program with [entr](https://eradman.com/entrproject/):
 
 ```sh
