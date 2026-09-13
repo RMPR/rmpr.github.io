@@ -17,7 +17,7 @@
   .l, .ld, .m, .mb, .mf, .mh, .mi, .mo, .il { color: #bd93f9 } // numbers / literals
   .s, .sa, .sb, .sc, .dl, .sd, .s2, .se, .sh, .si, .sx, .sr, .s1, .ss { color: #f1fa8c } // strings
   .na { color: #50fa7b }   // attribute names
-  .nb, .bp { color: #8be9fd; font-style: italic } // builtins
+  .nb, .bp { color: #8be9fd } // builtins
   .nc, .nn { color: #8be9fd } // classes / namespaces
   .nd { color: #50fa7b }   // decorators
   .ne, .nl { color: #8be9fd }
