@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Internationalization in Org-mode with Doom Emacs
+tags: [emacs]
 ---
 Not so long ago, I discovered [digraphs](https://vim.fandom.com/wiki/Entering_special_characters) 
 and since I use [aerc](https://aerc-mail.org/) as my email client, I immediately 

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: One-liner to reverse a String on a word basis
+tags: [shell]
 description: One-liner to reverse a String on a word basis
 ---
 

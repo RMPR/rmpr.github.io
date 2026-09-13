@@ -1,6 +1,7 @@
 ---
 layout: post
 title: A re-introduction to Javascript (ES6) - French
+tags: [javascript, french]
 ---
 
 C'est juste une résumé (en français) de ce que j’ai compris de la lecture de l’article dont le lien est le suivant  :

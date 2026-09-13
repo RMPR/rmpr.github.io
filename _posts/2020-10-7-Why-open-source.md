@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Why I like Open Source
+tags: [open-source, atbswp]
 ---
 While working on my [minimalist macro recorder](https://github.com/rmpr/atbswp), 
 which was just a little thing I did [out of frustration](https://rmpr.xyz/Announcing-atbswp/).

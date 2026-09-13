@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Characters array and String litterals in C
+tags: [c]
 description: Characters array and String literals in C
 ---
 Consider the following two snippets

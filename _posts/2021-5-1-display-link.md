@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Display Driver on RedHat-based Linux distributions (tested on Asus MB169B+)
+tags: [linux, fedora, hardware]
 ---
 I got myself a Asus MB169B+ to use with my Thinkpad X1 Yoga, and what leads me to write this is because when
 you try to install the displaylink driver you are instantly redirected to Ubuntu's, even very active members

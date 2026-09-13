@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Vim Sessions
+tags: [vim]
 ---
 Even though I prefer to use one buffer at a time to be more focused. I sometimes needed to have multiple buffers 
 open in splits (Terminal, Netrw, ...). And when for whatever reason, I needed to close them or shutdown my computer. I didn't like loosing my context. Enter Vim sessions.

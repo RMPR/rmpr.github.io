@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Yet another use of a Raspberry with an old screen
+tags: [raspberry-pi, linux]
 ---
 I have an old ultra HD non-smart TV, here's just a tip to make it to good use with
 a Raspberry.

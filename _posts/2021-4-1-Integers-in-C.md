@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Integers in C or how to shoot yourself in the foot a thousand times
+tags: [c]
 description: Integers in C or how to shoot yourself in the foot a thousand times
 ---
 

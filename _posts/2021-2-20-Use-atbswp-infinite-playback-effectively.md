@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Use atbswp's infinite playback effectively - case of a Youtube video
+tags: [atbswp, productivity]
 ---
 If you use atbswp (or any macro recorder) for a punctual task, this guide is not for you. My target are 
 repetitive tasks that you can make atbswp perform infinitely (watching repeatedly a Youtube video for example).

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: One-liner to test the requirements for building the Linux Kernel
+tags: [linux, shell]
 ---
 
 I applied to a program at the Linux Foundation, and even though it didn't go exactly well (I was too

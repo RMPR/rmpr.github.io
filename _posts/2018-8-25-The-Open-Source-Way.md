@@ -1,6 +1,7 @@
 ---
 layout: post
 title: The Open Source Way
+tags: [open-source]
 ---
 
 I've been throught many articles, videos, etc. That cover just one topic : Opensource, one of the resources I’ve been through really impressed me and I decided to share the content:

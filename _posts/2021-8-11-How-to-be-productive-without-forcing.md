@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Comment être plus productif sans se forcer ?
+tags: [productivity, french]
 ---
 Ceci est une traduction de l&rsquo;article [How to be productive without forcing yourself](<https://www.deprocrastination.co/blog/how-to-be-productive-without-forcing-yourself>)
 donc (il y&rsquo;a certainement) des choses qui ont été perdues lors de la traduction.

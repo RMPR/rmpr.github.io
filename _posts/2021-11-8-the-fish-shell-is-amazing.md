@@ -1,6 +1,7 @@
 ---
 layout: post
 title: The fish shell is amazing
+tags: [shell]
 ---
 
 

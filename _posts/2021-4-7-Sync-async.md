@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Synchronous Async
+tags: [atbswp, python]
 description: How it became possible to stop infinite playback in atbswp
 ---
 This piece might need to dive a bit in the source code of [atbswp](https://git.sr.ht/~rmpr/atbswp).

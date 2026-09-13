@@ -1,6 +1,7 @@
 ---
 layout: post
 title: It seems like Stevey was right
+tags: [ai, python]
 ---
 
 TL;DR This is a blog entry about me using

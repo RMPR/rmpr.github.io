@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Frankentile (KDE + i3)
+tags: [linux, tiling-wm]
 ---
 I used i3 for 2 years (2017-2019), then Sway to get a taste of Wayland 
 for almost the same amount of time. Although I was quite satisfied with my 

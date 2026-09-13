@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Announcing atbswp, a minimalist macro recorder
+tags: [atbswp, open-source, python]
 ---
 
 [atbswp](https://github.com/rmpr/atbswp): Automate The Boring Stuff With Python (yes like the book) is a multi platform, open source clone of tinytask, and for those who don't know it, 

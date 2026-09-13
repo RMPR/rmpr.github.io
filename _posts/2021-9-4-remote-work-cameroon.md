@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Thoughts on how to find remote work in Cameroon
+tags: [remote-work, career]
 ---
 
 [Remote work is the new norm](<https://www.economist.com/graphic-detail/2021/08/11/for-programmers-remote-working-is-becoming-the-norm>)

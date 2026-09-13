@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Migrating from Twitter to Mastodon
+tags: [mastodon, open-source]
 ---
 
 Straight from their main page: "Mastodon is an open source decentralized social network", 

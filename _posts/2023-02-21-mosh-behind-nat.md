@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Connect to a server behind a NAT using mosh
+tags: [networking, self-hosting]
 ---
 
 If you're not familiar with [mosh](https://mosh.org/) it's essentially SSH but

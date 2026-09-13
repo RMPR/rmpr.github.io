@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Preview Images Using Neovim in Fedora
+tags: [vim, fedora]
 ---
 
 To preview images with neovim you can use the plugin [`telescope-media-files.nvim`](https://github.com/nvim-telescope/telescope-media-files.nvim) 

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Approche guerilla au Google Summer of Code
+tags: [gsoc, open-source, french]
 ---
 Note préliminaire, si tu n'as aucune idée de ce qu'est le GSoC je te renvoie vers l'excellente
 [page Wikipedia](https://fr.wikipedia.org/wiki/Google_Summer_of_Code) à ce sujet.

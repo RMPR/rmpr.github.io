@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Flashing a Jetson without SDK Manager on Fedora
+tags: [fedora, hardware, linux]
 ---
 
 The official instructions to setup Jetson recommend to use [SDK

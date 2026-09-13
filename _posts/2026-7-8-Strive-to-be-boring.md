@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Strive to be boring
+tags: [software-engineering, career]
 ---
 
 Like every software engineer, I am funneling my inner woodworker. And ever since

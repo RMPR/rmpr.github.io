@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Running an external command on the content of a register in Vim
+tags: [vim]
 ---
 
 While working on a [side project](https://github.com/rmpr/atbswp) I faced a really annoying problem, run a

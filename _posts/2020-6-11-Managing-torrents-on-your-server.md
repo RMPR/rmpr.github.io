@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Monitoring Torrents On Your Server
+tags: [self-hosting, linux]
 ---
 There are a lot of clients to manage torrents on your server: deluge, rtorrent, ... but I decided to settle with 
 transmission, mainly because it's already installed in most of the distributions I had to manage and it provides 

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: How I learned to embrace failure
+tags: [career, writing]
 ---
 
 If you see my Github profile, especially the contribution map, I'm almost active everyday, which is quite
