@@ -142,7 +142,9 @@ pre {
   border-radius: 8px;
   padding: var(--space-lg);
   margin: var(--space-xl) 0;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
   font-size: 0.9rem;
   line-height: 1.55;
 
