@@ -1,18 +1,25 @@
 ---
 layout: default
 ---
-<div class="posts">
-  {% for post in site.posts %}
-    <article class="post">
 
-        <h1><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }} </a></h1>
-        <div class="date">{{ post.date | date: "%B %e, %Y" }}</div>
+<p class="home-intro">{{ site.description }}. I write here about software, tooling, and whatever I'm currently tinkering with.</p>
 
-      <div class="entry">
-        {{ post.excerpt }}
-      </div>
-
-      <a href="{{ site.baseurl }}{{ post.url }}" class="read-more">Read More</a>
-    </article>
+<div class="stream">
+  {% assign posts_by_year = site.posts | group_by_exp: "post", "post.date | date: '%Y'" %}
+  {% for year in posts_by_year %}
+    <div class="stream__year">{{ year.name }}</div>
+    {% for post in year.items %}
+      <article class="stream__item">
+        <time class="stream__date" datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%b %-d" }}</time>
+        <div class="stream__body">
+          <div class="stream__title"><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></div>
+          {% if post.tags and post.tags.size > 0 %}
+            <div class="stream__tags">
+              {% for tag in post.tags %}<a href="{{ site.baseurl }}/tags/#{{ tag | slugify }}">#{{ tag }}</a>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
   {% endfor %}
 </div>

@@ -1,25 +1,17 @@
-
 //
 // VARIABLES
 //
 
-// Colors
-$blue: #4183C4;
+// Font stacks (loaded from Google Fonts in default.html)
+$sans:      "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+$condensed: "IBM Plex Sans Condensed", ui-sans-serif, system-ui, sans-serif;
+$mono:      "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-// Grays
-$black: #000;
-$darkerGray: #222;
-$darkGray: #333;
-$gray: #666;
-$lightGray: #eee;
-$white: #fff;
+// Layout
+$content-width: 850px;
+$prose-width:   65ch;
 
-// Font stacks
-$helvetica: Helvetica, Arial, sans-serif;
-$helveticaNeue: "Helvetica Neue", Helvetica, Arial, sans-serif;
-$georgia: Georgia, serif;
-
-// Mobile breakpoints
+// Mobile breakpoint
 @mixin mobile {
   @media screen and (max-width: 640px) {
     @content;

@@ -9,281 +9,446 @@
 @import "variables";
 // Syntax highlighting @import is at the bottom of this file
 
+/****************/
+/* THEME TOKENS */
+/****************/
+
+:root {
+  --bg:            #f8f5ed;
+  --text:          #1a1a1a;
+  --heading:       #000;
+  --accent:        #4f9bc9;
+  --muted:         rgba(26, 26, 26, 0.72);
+  --border:        rgba(26, 26, 26, 0.15);
+  --surface:       rgba(26, 26, 26, 0.04);
+  --surface-hover: rgba(26, 26, 26, 0.07);
+
+  --code-bg:   #282a36;
+  --code-text: #f8f8f2;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2rem;
+  --space-3xl: 3rem;
+
+  color-scheme: light dark;
+}
+
+html.dark {
+  --bg:            #1a1a1a;
+  --text:          #e8e8e8;
+  --heading:       #fff;
+  --accent:        #83c8f4;
+  --muted:         rgba(255, 255, 255, 0.72);
+  --border:        rgba(255, 255, 255, 0.18);
+  --surface:       rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+}
+
 /**************/
 /* BASE RULES */
 /**************/
 
+* { box-sizing: border-box; }
+
 html {
   font-size: 100%;
+  background: var(--bg);
 }
 
 body {
-	background: $white;
-  font: 18px/1.4 $helvetica;
-  color: $darkGray;
+  background: var(--bg);
+  color: var(--text);
+  font-family: $sans;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .container {
   margin: 0 auto;
-  max-width: 740px;
-  padding: 0 10px;
+  max-width: $content-width;
+  padding: 0 var(--space-xl);
   width: 100%;
+
+  @include mobile {
+    padding: 0 var(--space-lg);
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: $helveticaNeue;
-  color: $darkerGray;
-  font-weight: bold;
-
-  line-height: 1.7;
-  margin: 1em 0 15px;
-  padding: 0;
-
-  @include mobile {
-    line-height: 1.4;
-  }
+  font-family: $sans;
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.6em 0 0.6em;
+  letter-spacing: -0.01em;
 }
 
-h1 {
-  font-size: 30px;
-  a {
-    color: inherit;
-  }
-}
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.45rem; }
+h3 { font-size: 1.2rem; }
+h4 { font-size: 1.05rem; }
 
-h2 {
-  font-size: 24px;
-}
-
-h3 {
-  font-size: 20px;
-}
-
-h4 {
-  font-size: 18px;
-  color: $gray;
-}
-
-p {
-  margin: 15px 0;
-}
+p { margin: 0 0 1.15em; }
 
 a {
-  color: $blue;
+  color: var(--accent);
   text-decoration: none;
-	cursor: pointer;
-  &:hover, &:active {
-    color: $blue;
+  cursor: pointer;
+  text-underline-offset: 2px;
+  &:hover, &:focus-visible {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
   }
 }
 
 ul, ol {
-  margin: 15px 0;
-  padding-left: 30px;
+  margin: 0 0 1.15em;
+  padding-left: 1.4em;
+}
+ul { list-style-type: disc; }
+ol { list-style-type: decimal; }
+li { margin: 0.3em 0; }
+ol ul, ul ol, ul ul, ol ol { margin: 0.2em 0; }
+
+em, i { font-style: italic; }
+strong, b { font-weight: 600; }
+
+img { max-width: 100%; height: auto; }
+.gmnoprint img { max-width: none; }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-2xl) 0;
 }
 
-ul {
-  list-style-type: disc;
+code {
+  font-family: $mono;
+  font-size: 0.9em;
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
 }
 
-ol {
-  list-style-type: decimal;
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  margin: var(--space-xl) 0;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.55;
+
+  code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
 }
 
-ol ul, ul ol, ul ul, ol ol {
-  margin: 0;
-}
-
-ul ul, ol ul {
-  list-style-type: circle;
-}
-
-em, i {
+blockquote {
+  margin: var(--space-xl) 0;
+  border-left: 3px solid var(--accent);
+  padding: 0.2em 0 0.2em 1.1em;
+  color: var(--muted);
   font-style: italic;
+
+  p:last-child { margin-bottom: 0; }
 }
 
-strong, b {
-  font-weight: bold;
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-xl) 0;
+  font-size: 0.95rem;
+
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5em 0.7em;
+    text-align: left;
+  }
+  th { background: var(--surface); font-weight: 600; }
 }
 
-img {
-  max-width: 100%;
-}
-
-// Fixes images in popup boxes from Google Translate
-.gmnoprint img {
-  max-width: none;
-}
-
-.date {
-  font-style: italic;
-  color: $gray;
-}
-
-// Specify the color of the selection
-::-moz-selection {
-  color: $black;
-  background: $lightGray;
-}
-::selection {
-  color: $black;
-  background: $lightGray;
-}
-
-// Nicolas Gallagher's micro clearfix hack
-// http://nicolasgallagher.com/micro-clearfix-hack/
-.clearfix:before,
-.clearfix:after {
-    content: " ";
-    display: table;
-}
-
-.clearfix:after {
-    clear: both;
-}
+::selection { background: var(--accent); color: var(--bg); }
 
 /*********************/
-/* LAYOUT / SECTIONS */
+/* HEADER / MASTHEAD */
 /*********************/
 
-//
-// .masthead
-//
-
-.wrapper-masthead {
-  margin-bottom: 50px;
-}
-
-.masthead {
-  padding: 20px 0;
-  border-bottom: 1px solid $lightGray;
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl) 0;
+  margin-bottom: var(--space-3xl);
+  border-bottom: 1px solid var(--border);
 
   @include mobile {
-    text-align: center;
+    margin-bottom: var(--space-2xl);
   }
 }
 
-.site-avatar {
-  float: left;
-  width: 70px;
-  height: 70px;
-  margin-right: 15px;
-
-  @include mobile {
-    float: none;
-    display: block;
-    margin: 0 auto;
-  }
-
-  img {
-    border-radius: 5px;
-  }
+.site-logo a {
+  font-family: $condensed;
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+  color: var(--heading);
+  &:hover { text-decoration: none; color: var(--accent); }
 }
 
-.site-info {
-  float: left;
+.header-spacer { flex: 1; }
 
-  @include mobile {
-    float: none;
-    display: block;
-    margin: 0 auto;
-  }
-}
-
-.site-name {
-  margin: 0;
-  color: $darkGray;
-  cursor: pointer;
-  font-family: $helveticaNeue;
-  font-weight: 300;
-  font-size: 28px;
-  letter-spacing: 1px;
-}
-
-.site-description {
-  margin: -5px 0 0 0;
-  color: $gray;
-  font-size: 16px;
-
-  @include mobile {
-    margin: 3px 0;
-  }
-}
-
-nav {
-  float: right;
-  margin-top: 23px; // @TODO: Vertically middle align
-  font-family: $helveticaNeue;
-  font-size: 18px;
-
-  @include mobile {
-    float: none;
-    margin-top: 9px;
-    display: block;
-    font-size: 16px;
-  }
+.header-nav {
+  display: flex;
+  gap: var(--space-lg);
+  font-family: $condensed;
+  font-size: 1rem;
 
   a {
-    margin-left: 20px;
-    color: $darkGray;
-    text-align: right;
-    font-weight: 300;
-    letter-spacing: 1px;
+    color: var(--muted);
+    &:hover, &:focus-visible { color: var(--accent); text-decoration: none; }
+  }
 
-    @include mobile {
-      margin: 0 10px;
-      color: $blue;
+  @include mobile { gap: var(--space-md); }
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover { color: var(--accent); border-color: var(--accent); }
+
+  svg { width: 1.05rem; height: 1.05rem; }
+  .icon-sun  { display: none; }
+  .icon-moon { display: block; }
+}
+html.dark .theme-toggle {
+  .icon-sun  { display: block; }
+  .icon-moon { display: none; }
+}
+
+/**********/
+/* STREAM */
+/**********/
+
+.home-intro {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: var(--space-3xl);
+  max-width: $prose-width;
+
+  a { font-weight: 500; }
+}
+
+.stream { margin-bottom: var(--space-3xl); }
+
+.stream__year {
+  font-family: $condensed;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  padding-bottom: var(--space-sm);
+  margin: var(--space-2xl) 0 var(--space-lg);
+  border-bottom: 1px solid var(--border);
+
+  &:first-child { margin-top: 0; }
+}
+
+.stream__item {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  column-gap: var(--space-lg);
+  align-items: baseline;
+  padding: var(--space-sm) 0;
+
+  @include mobile {
+    grid-template-columns: 3rem 1fr;
+    column-gap: var(--space-md);
+  }
+}
+
+.stream__date {
+  font-family: $condensed;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.stream__title {
+  font-size: 1.15rem;
+  line-height: 1.35;
+
+  a {
+    color: var(--heading);
+    font-weight: 500;
+    &:hover { color: var(--accent); }
+  }
+}
+
+.stream__tags {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.6rem;
+  row-gap: 0.15rem;
+  font-family: $condensed;
+  font-size: 0.85rem;
+
+  a { color: var(--muted); &:hover { color: var(--accent); } }
+}
+
+/********/
+/* POST */
+/********/
+
+.prose {
+  max-width: $prose-width;
+
+  h1.post-title {
+    font-size: 2.1rem;
+    line-height: 1.15;
+    margin: 0 0 var(--space-sm);
+    letter-spacing: -0.02em;
+  }
+
+  .post-meta {
+    font-family: $condensed;
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    font-family: $condensed;
+    font-size: 0.9rem;
+    margin-top: var(--space-2xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border);
+
+    a { color: var(--muted); &:hover { color: var(--accent); } }
+  }
+
+  img { border-radius: 8px; }
+}
+
+.post-nav {
+  margin-top: var(--space-2xl);
+
+  a {
+    font-family: $condensed;
+    color: var(--muted);
+    &:hover { color: var(--accent); text-decoration: none; }
+  }
+}
+
+.comments { margin-top: var(--space-3xl); }
+
+/********/
+/* TAGS */
+/********/
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-3xl);
+
+  a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-family: $condensed;
+    font-size: 0.95rem;
+    color: var(--muted);
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+
+    &:hover, &:focus-visible {
+      color: var(--accent);
+      border-color: var(--accent);
+      text-decoration: none;
     }
   }
+
+  .tag-count { font-size: 0.8rem; opacity: 0.7; }
 }
 
-//
-// .main
-//
-
-.posts > .post {
-  padding-bottom: 2em;
-  border-bottom: 1px solid $lightGray;
+.tag-section {
+  margin-bottom: var(--space-2xl);
+  scroll-margin-top: var(--space-xl);
 }
 
-.posts > .post:last-child {
-  padding-bottom: 1em;
-  border-bottom: none;
+.tag-heading {
+  font-family: $condensed;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  padding-bottom: var(--space-sm);
+  margin: 0 0 var(--space-md);
+  border-bottom: 1px solid var(--border);
 }
 
-.post {
-  blockquote {
-    margin: 1.8em .8em;
-    border-left: 2px solid $gray;
-    padding: 0.1em 1em;
-    color: $gray;
-    font-size: 22px;
-    font-style: italic;
-  }
+.tag-section .stream__item {
+  grid-template-columns: 6.5rem 1fr;
 
-  .comments {
-    margin-top: 10px;
-  }
-
-  .read-more {
-    text-transform: uppercase;
-    font-size: 15px;
+  @include mobile {
+    grid-template-columns: 5rem 1fr;
   }
 }
 
-.wrapper-footer {
-  margin-top: 50px;
-  border-top: 1px solid #ddd;
-  border-bottom: 1px solid #ddd;
-  background-color: $lightGray;
+/**********/
+/* FOOTER */
+/**********/
+
+.site-footer {
+  margin-top: var(--space-3xl);
+  padding: var(--space-2xl) 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
-footer {
-  padding: 20px 0;
-  text-align: center;
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  font-family: $condensed;
+  margin-bottom: var(--space-sm);
+
+  a { color: var(--muted); &:hover { color: var(--accent); } }
 }
 
-// Settled on moving the import of syntax highlighting to the bottom of the CSS
-// ... Otherwise it really bloats up the top of the CSS file and makes it difficult to find the start
+.footer-copy {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+// Syntax highlighting theme lives at the bottom to keep the top of the file readable
 @import "highlights";
-@import "svg-icons";
