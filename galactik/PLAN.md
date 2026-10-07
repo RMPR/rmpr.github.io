@@ -1,9 +1,8 @@
 # Galactik Football — Design & Implementation Plan
 
-A browser-playable Galactik Football game written in Rust with **Bevy** (rendering through
-wgpu), with
-PES-style football as the base layer and the Flux of each team woven into the
-controls rather than bolted on as cutscenes. First release ships two teams:
+A browser-playable Galactik Football game written in Rust with **Bevy**
+(rendering through wgpu), with PES-style football as the base layer and the
+Flux of each team woven into the controls rather than bolted on as cutscenes. First release ships two teams:
 the **Snow Kids** (the Breath of Akillian) and the **Shadows** (the Smog).
 
 Target quality bar: "not AAA, not far from it" — stylised cel-shaded 3D, 60 fps
