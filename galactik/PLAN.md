@@ -503,6 +503,31 @@ core is built for it), mixed-flux "Paradisia" mode.
 
 ---
 
+## 6b. Implementation status (October 2026)
+
+What exists in the repo today, against the milestones above:
+
+| # | Milestone              | Status                                                                                         |
+|---|------------------------|------------------------------------------------------------------------------------------------|
+| 0 | Skeleton               | **Done.** Workspace, Bevy 0.19 app, trunk web build, GitHub Actions workflow that tests the sim, builds the WebGPU and WebGL2 bundles and commits them to `galactik/dist`. |
+| 1 | Pitch & ball           | **Done.** Holographic pitch, goals with posts and crossbar, ball physics with drag, Magnus curl, bounce and rolling friction; deterministic sim with a hash test. |
+| 2 | One player PES feel    | **Done** (first pass). Acceleration-limited movement, sprint knock-on, heavy first touch, assisted and manual passes, power/finesse shots, keeper AI with reaction, dives, catches and parries. No egui tuning panel yet; constants are in `gf_core`. |
+| 3 | Full 7v7               | **Done** (first pass). Ground/lob/through passes, standing and slide tackles, fouls with free kicks and penalties, corners, goal kicks, re-entries, halves and kick-offs, formation AI with pressing and zonal marking, player switching, two local players. |
+| 4 | Flux core              | **Done.** Shared pool with style-specific charging, per-player strain, fatigue, burnout and Smog sickness, all 14 basic Flux actions for both teams, Flux duels with slow motion, keeper Flux, Eclipse Cloud. |
+| 5 | Characters & animation | **Not started.** Players are capsules in kit colours with an accent-coloured head; actions are shown by tilting the capsule. The glTF rig, animation graph, cel material and outline pass remain to do. |
+| 6 | Signatures & Team Flux | **Partial.** Both Team Flux ultimates (Akillian Blizzard, Eclipse) work with stadium-wide colour changes. The 15 per-player signature moves are defined in data but not yet implemented. No audio. |
+| 7 | Modes & polish         | **Partial.** Title screen with team choice, two-player toggle, half length and difficulty; pause; full-time screen. Cup mode, rebinding and the loading screen remain. |
+
+Deviations from the plan, to revisit:
+- `gf_data` is a module inside `gf_core` rather than its own crate.
+- Particles are emissive sphere entities spawned from events rather than
+  `bevy_hanabi`; input is mapped by hand rather than through
+  `bevy_enhanced_input`; there is no `bevy_egui` panel yet. All three were
+  dropped to keep the first build small and the API surface known.
+- Flux costs and effects live in `gf_core::flux` as code, not in RON files.
+
+---
+
 ## 7. Key risks and the plan for each
 | Risk | Mitigation |
 |------|------------|

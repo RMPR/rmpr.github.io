@@ -1,0 +1,12 @@
+[package]
+name = "gf_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Engine-free deterministic Galactik Football simulation"
+
+[dependencies]
+glam.workspace = true
+ron.workspace = true
+serde.workspace = true
+log.workspace = true

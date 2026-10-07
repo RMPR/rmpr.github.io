@@ -1,0 +1,10 @@
+[build]
+target = "index.html"
+dist = "../dist"
+public_url = "./"
+release = true
+filehash = false
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8080

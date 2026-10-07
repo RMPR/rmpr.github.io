@@ -1,0 +1,62 @@
+name: Galactik Football
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "galactik/**"
+      - "!galactik/dist/**"
+      - ".github/workflows/galactik.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: galactik-build
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: galactik
+      - name: Simulation tests
+        working-directory: galactik
+        run: cargo test -p gf_core --release
+
+  build-web:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: galactik
+      - name: Install trunk
+        run: |
+          curl -sSL https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /usr/local/bin
+      - name: Build (WebGPU)
+        working-directory: galactik/web
+        run: trunk build --release
+      - name: Build (WebGL2 fallback)
+        working-directory: galactik/web
+        run: |
+          sed 's/data-cargo-features="webgpu"/data-cargo-features="webgl2"/' index.html > index-gl.html
+          trunk build --release --dist ../dist-gl index-gl.html
+          mv ../dist-gl/index-gl.html ../dist-gl/index.html
+      - name: Size report
+        run: ls -la galactik/dist galactik/dist-gl && du -sh galactik/dist/*.wasm galactik/dist-gl/*.wasm
+      - name: Commit the built game
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f galactik/dist galactik/dist-gl
+          git diff --cached --quiet || git commit -m "Build Galactik Football web bundle [skip ci]"
+          git push

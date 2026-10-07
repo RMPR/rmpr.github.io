@@ -84,3 +84,13 @@ exclude:
   - LICENSE
   - README.md
   - CNAME
+  # Galactik Football sources: only galactik/dist (the built game) is published.
+  - galactik/crates
+  - galactik/assets
+  - galactik/web
+  - galactik/target
+  - galactik/Cargo.toml
+  - galactik/Cargo.lock
+  - galactik/PLAN.md
+  - galactik/README.md
+  - galactik/.gitignore
