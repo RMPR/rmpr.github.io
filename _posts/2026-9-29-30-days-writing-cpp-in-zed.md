@@ -1,6 +1,7 @@
 ---
 layout: post
 title: 30 days writing C++ in Zed
+tags: [productivity]
 ---
 
 # Pre start
