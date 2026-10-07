@@ -22,9 +22,10 @@ pub enum BaseAction {
     Keeper,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum FluxAction {
     // Breath of Akillian
+    #[default]
     Burst,
     AkillianStrike,
     IceLane,

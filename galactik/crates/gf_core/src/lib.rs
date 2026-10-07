@@ -1,4 +1,5 @@
 //! Galactik Football simulation core. Engine-free and deterministic.
+#![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 pub mod ai;
 pub mod ball;
@@ -28,13 +29,13 @@ mod tests {
         let a = (tick as f32) * 0.01;
         f.movement = Vec2::new(a.cos(), (a * 0.7).sin());
         f.sprint.held = tick % 200 < 100;
-        f.sprint.pressed = tick % 200 == 0;
+        f.sprint.pressed = tick.is_multiple_of(200);
         f.flux = tick % 600 < 300;
         f.pass.held = tick % 90 < 20;
         f.pass.released = tick % 90 == 20;
         f.shoot.held = tick % 250 < 40;
         f.shoot.released = tick % 250 == 40;
-        f.action_a.pressed = tick % 37 == 0;
+        f.action_a.pressed = tick.is_multiple_of(37);
         f
     }
 

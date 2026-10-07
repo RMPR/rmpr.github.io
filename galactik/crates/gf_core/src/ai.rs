@@ -284,8 +284,8 @@ pub fn decide(sim: &Sim, rng: &mut Rng, id: usize) -> (InputFrame, f32) {
     f.sprint = Button { held: sprint, pressed: false, released: false };
 
     // Defending: tackle when on the carrier.
-    if let Some(o) = sim.ball.owner {
-        if sim.players[o].team != team && !me.is_gk() {
+    if let Some(o) = sim.ball.owner
+        && sim.players[o].team != team && !me.is_gk() {
             let dist = me.p.distance(sim.ball.xy());
             let pool = sim.teams[team].pool;
             let kind = sim.teams[team].kind;
@@ -306,7 +306,6 @@ pub fn decide(sim: &Sim, rng: &mut Rng, id: usize) -> (InputFrame, f32) {
                 f.special = pressed();
             }
         }
-    }
     // Breath: super-jump onto a high ball near us.
     if sim.teams[team].kind == FluxKind::Breath && sim.ball.owner.is_none() {
         let z = sim.ball.p.z;
@@ -381,7 +380,7 @@ fn decide_carrier(sim: &Sim, rng: &mut Rng, id: usize) -> InputFrame {
         let o = &sim.players[t];
         let d = o.p - me.p;
         let dist = d.length();
-        if dist < 2.0 || dist > 32.0 {
+        if !(2.0..=32.0).contains(&dist) {
             continue;
         }
         let dn = d / dist;

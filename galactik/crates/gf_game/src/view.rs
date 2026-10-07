@@ -6,7 +6,7 @@ use crate::sim_plugin::{MatchRes, Paused};
 use crate::AppState;
 use bevy::prelude::*;
 use gf_core::pitch::*;
-use gf_core::{Action, FluxAction, FluxKind, Phase};
+use gf_core::{Action, FluxKind, Phase};
 
 pub struct ViewPlugin;
 
@@ -43,7 +43,7 @@ pub struct CloudView {
     pub index: usize,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct MatchEntity;
 
 fn spawn_pitch(mut commands: Commands, pal: Res<Palette>, mut meshes: ResMut<Assets<Mesh>>) {
@@ -52,7 +52,7 @@ fn spawn_pitch(mut commands: Commands, pal: Res<Palette>, mut meshes: ResMut<Ass
     let ground = meshes.add(Plane3d::default().mesh().size(HALF_LEN * 2.0 + 16.0, HALF_WID * 2.0 + 16.0));
     commands.spawn((Mesh3d(ground), MeshMaterial3d(pal.pitch_mat.clone()), Transform::from_xyz(0.0, -0.02, 0.0), scoped.clone()));
 
-    let mut line = |commands: &mut Commands, a: Vec2, b: Vec2| {
+    let line = |commands: &mut Commands, a: Vec2, b: Vec2| {
         let d = b - a;
         let len = d.length();
         let mid = (a + b) * 0.5;

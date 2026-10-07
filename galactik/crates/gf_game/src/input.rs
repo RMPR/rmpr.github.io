@@ -4,7 +4,7 @@
 use crate::sim_plugin::Paused;
 use crate::{AppState, MatchSetup};
 use bevy::prelude::*;
-use gf_core::{Button, InputFrame};
+use gf_core::InputFrame;
 
 pub struct InputPlugin;
 

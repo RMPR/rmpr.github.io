@@ -143,7 +143,8 @@ fn trails(mut commands: Commands, m: Res<MatchRes>, pal: Res<Palette>, mut fx: R
         burst(&mut commands, &mut fx, &pal, mat, Vec3::new(b.p.x, b.p.z + 0.1, b.p.y), 2, 0.6, 0.45, 0.0);
     }
     for c in &sim.clouds {
-        burst(&mut commands, &mut fx, &pal, pal.smoke_mat.clone(), to_world(c.p + Vec2::new(fx.sym(), fx.sym()) * c.r * 0.8, 0.3), 2, 1.0, 1.0, -1.2);
+        let jitter = Vec2::new(fx.sym(), fx.sym()) * c.r * 0.8;
+        burst(&mut commands, &mut fx, &pal, pal.smoke_mat.clone(), to_world(c.p + jitter, 0.3), 2, 1.0, 1.0, -1.2);
     }
 }
 

@@ -21,5 +21,5 @@ pub fn goal_x(dir: f32) -> f32 {
 /// True if the point is inside the penalty box of the goal at `x = HALF_LEN*dir`.
 pub fn in_box(p: glam::Vec2, dir: f32) -> bool {
     let depth = HALF_LEN - p.x * dir;
-    depth >= 0.0 && depth <= BOX_DEPTH && p.y.abs() <= BOX_HALF_WIDTH
+    (0.0..=BOX_DEPTH).contains(&depth) && p.y.abs() <= BOX_HALF_WIDTH
 }

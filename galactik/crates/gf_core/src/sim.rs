@@ -497,12 +497,11 @@ impl Sim {
         for id in 0..self.players.len() {
             let team = self.players[id].team;
             let controlled = self.teams[team].human && self.teams[team].controlled == Some(id);
-            if controlled && !self.players[id].is_gk() {
-                if let Some(f) = human[team] {
+            if controlled && !self.players[id].is_gk()
+                && let Some(f) = human[team] {
                     frames[id] = f;
                     continue;
                 }
-            }
             let mem = self.ai_mem[id];
             if mem.until > self.time {
                 frames[id] = mem.frame;
@@ -764,9 +763,9 @@ impl Sim {
                 self.gain(team, PoolGain::SprintWithBallSecond);
             }
         }
-        if !has_ball {
-            if let Some(o) = self.ball.owner {
-                if self.players[o].team != team && self.players[o].p.distance(self.players[id].p) < 3.0 {
+        if !has_ball
+            && let Some(o) = self.ball.owner
+                && self.players[o].team != team && self.players[o].p.distance(self.players[id].p) < 3.0 {
                     let pl = &mut self.players[id];
                     pl.press_timer += dt;
                     if pl.press_timer >= 1.0 {
@@ -774,8 +773,6 @@ impl Sim {
                         self.gain(team, PoolGain::PressSecond);
                     }
                 }
-            }
-        }
     }
 
     fn separate_players(&mut self) {
@@ -996,14 +993,12 @@ impl Sim {
         self.players[id].hold_through = 0.0;
         self.events.push(SimEvent::Kick { player: id, power, kind: cmd.kind, flux: flux_action.is_some() });
         self.pending_pass = target.map(|t| (team, id, t));
-        if cmd.kind != KickKind::Shot {
-            if let Some(t) = target {
-                if self.teams[team].human {
+        if cmd.kind != KickKind::Shot
+            && let Some(t) = target
+                && self.teams[team].human {
                     self.teams[team].controlled = Some(t);
                     self.teams[team].last_switch = now;
                 }
-            }
-        }
         if self.is_dead_ball() {
             if let Phase::KickOff { team: kt, .. } = self.phase {
                 self.events.push(SimEvent::KickOff { team: kt });
@@ -1245,12 +1240,11 @@ impl Sim {
         let me_p = self.players[id].p;
         let mut found = None;
         for &o in &self.teams[Self::opponent(team)].players {
-            if let Some(f) = self.players[o].flux {
-                if now - f.started_at <= flux::DUEL_WINDOW && now - f.started_at > 0.0 && self.players[o].p.distance(me_p) < flux::DUEL_RANGE {
+            if let Some(f) = self.players[o].flux
+                && now - f.started_at <= flux::DUEL_WINDOW && now - f.started_at > 0.0 && self.players[o].p.distance(me_p) < flux::DUEL_RANGE {
                     found = Some(o);
                     break;
                 }
-            }
         }
         let Some(o) = found else { return false };
         self.duel(id, o, 0.1);
@@ -1325,11 +1319,10 @@ impl Sim {
 
         let blizzard = (0..2).any(|t| self.teams[t].team_flux_active(now) && self.teams[t].kind == FluxKind::Breath);
         let friction = if self.ball.flags.ice_lane { 0.25 } else if blizzard { 0.5 } else { 1.0 };
-        if let Some(speed) = self.ball.integrate(dt, friction) {
-            if speed > 1.5 {
+        if let Some(speed) = self.ball.integrate(dt, friction)
+            && speed > 1.5 {
                 self.events.push(SimEvent::Bounce { pos: self.ball.xy(), speed });
             }
-        }
         if self.ball.v.length() < 0.2 && self.ball.p.z <= BALL_RADIUS + 0.01 {
             self.ball.flags.ice_lane = false;
         }
@@ -1397,11 +1390,10 @@ impl Sim {
                 let prev_team = b.last_team;
                 b.last_team = Some(team);
                 self.events.push(SimEvent::Possession { player: id });
-                if let Some((pt, passer, _)) = self.pending_pass.take() {
-                    if pt == team && passer != id {
+                if let Some((pt, passer, _)) = self.pending_pass.take()
+                    && pt == team && passer != id {
                         self.gain(team, PoolGain::PassComplete);
                     }
-                }
                 if prev_team.is_some() && prev_team != Some(team) {
                     self.gain(team, PoolGain::Interception);
                 }
@@ -1505,9 +1497,9 @@ impl Sim {
                             self.events.push(SimEvent::Teleport { player: gk, from, to: target });
                         }
                     }
-                    if self.ball.flags.flux_shot {
-                        if let Some(shooter) = self.ball.kicked_by {
-                            if self.players[gk].flux.is_some() {
+                    if self.ball.flags.flux_shot
+                        && let Some(shooter) = self.ball.kicked_by
+                            && self.players[gk].flux.is_some() {
                                 self.duel(shooter, gk, 0.05);
                                 if self.players[gk].flux.is_some() {
                                     // Keeper won: the shot loses its edge.
@@ -1515,8 +1507,6 @@ impl Sim {
                                     self.ball.v *= 0.7;
                                 }
                             }
-                        }
-                    }
                 }
                 let seen = self.teams[team].gk_shot_seen.unwrap_or(now);
                 let reflex = n(self.players[gk].stats.gk_reflex);

@@ -33,12 +33,6 @@ pub struct ActiveFlux {
     pub started_at: f32,
 }
 
-impl Default for FluxAction {
-    fn default() -> Self {
-        FluxAction::Burst
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlayerState {
     pub id: usize,
