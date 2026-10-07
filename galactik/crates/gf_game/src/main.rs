@@ -20,6 +20,14 @@ pub enum AppState {
     Match,
 }
 
+/// Ordering for the systems that build a match: the sim resource must exist
+/// before anything spawns views of it.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MatchSets {
+    Init,
+    Spawn,
+}
+
 /// Settings chosen on the title screen.
 #[derive(Resource, Debug, Clone)]
 pub struct MatchSetup {
@@ -27,17 +35,33 @@ pub struct MatchSetup {
     pub two_players: bool,
     pub half_len_secs: f32,
     pub difficulty: f32,
+    /// AI vs AI, for watching.
+    pub spectate: bool,
+    /// Skip the title screen (native `--match`).
+    pub auto_match: bool,
 }
 
 impl Default for MatchSetup {
     fn default() -> Self {
-        MatchSetup { human_team: 0, two_players: false, half_len_secs: 180.0, difficulty: 0.6 }
+        MatchSetup { human_team: 0, two_players: false, half_len_secs: 180.0, difficulty: 0.6, spectate: false, auto_match: false }
     }
 }
 
 fn main() {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
+
+    // Native dev flags: `--match` skips the title, `--ai` makes both teams AI.
+    let mut setup = MatchSetup::default();
+    #[cfg(not(target_arch = "wasm32"))]
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--match" => setup.auto_match = true,
+            "--ai" => setup.spectate = true,
+            "--shadows" => setup.human_team = 1,
+            _ => {}
+        }
+    }
 
     App::new()
         .add_plugins(
@@ -57,8 +81,9 @@ fn main() {
         )
         .insert_resource(ClearColor(Color::srgb(0.015, 0.015, 0.045)))
         .insert_resource(Time::<Fixed>::from_hz(gf_core::sim::DT.recip() as f64))
-        .init_resource::<MatchSetup>()
+        .insert_resource(setup)
         .init_state::<AppState>()
+        .configure_sets(OnEnter(AppState::Match), (MatchSets::Init, MatchSets::Spawn).chain())
         .add_plugins((
             setup::SetupPlugin,
             title::TitlePlugin,

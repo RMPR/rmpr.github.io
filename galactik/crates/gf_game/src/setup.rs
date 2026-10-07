@@ -53,6 +53,19 @@ pub fn hex(s: &str) -> Color {
     Srgba::hex(s).map(Color::from).unwrap_or(Color::WHITE)
 }
 
+/// A readable colour for a team in UI text: the kit's primary unless it is
+/// too dark, then the secondary, then the accent.
+pub fn team_ui_color(kit: &gf_core::data::Kit) -> Color {
+    for c in [&kit.primary, &kit.secondary, &kit.accent] {
+        let col = hex(c);
+        let lin: LinearRgba = col.into();
+        if lin.luminance() > 0.08 {
+            return col;
+        }
+    }
+    Color::WHITE
+}
+
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         MainCamera,

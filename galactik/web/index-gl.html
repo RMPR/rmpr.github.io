@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Galactik Football</title>
+  <link data-trunk rel="rust" href="../crates/gf_game/Cargo.toml" data-bin="gf_game" data-wasm-opt="z" data-cargo-no-default-features data-cargo-features="webgl2" />
+  <link data-trunk rel="css" href="style.css" />
+</head>
+<body>
+  <div id="frame">
+    <canvas id="gf-canvas"></canvas>
+    <div id="loading">
+      <div class="title">GALACTIK FOOTBALL</div>
+      <div class="sub">loading the Genesis Stadium…</div>
+      <div class="bar"><div class="fill"></div></div>
+      <div id="nogpu" class="warn" hidden>
+        Your browser does not expose WebGPU. Try the <a href="../dist-gl/">WebGL2 build</a>, or use a current Chrome, Edge, Firefox or Safari.
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var ok = !!navigator.gpu;
+      var w = document.getElementById('nogpu');
+      if (!ok) { w.hidden = false; }
+      var canvas = document.getElementById('gf-canvas');
+      var hide = function () { var l = document.getElementById('loading'); if (l) { l.classList.add('gone'); } };
+      var obs = new MutationObserver(function () { if (canvas.width > 0) { hide(); obs.disconnect(); } });
+      obs.observe(canvas, { attributes: true });
+      setTimeout(hide, 20000);
+      window.addEventListener('keydown', function (e) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].indexOf(e.code) >= 0) { e.preventDefault(); }
+      });
+    })();
+  </script>
+</body>
+</html>

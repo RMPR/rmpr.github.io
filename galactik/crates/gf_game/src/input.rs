@@ -66,46 +66,54 @@ fn apply(frame: &mut InputFrame, raw: Raw) {
     frame.kick = None;
 }
 
+fn down(keys: &ButtonInput<KeyCode>, k: KeyCode) -> bool {
+    keys.pressed(k) || keys.just_pressed(k)
+}
+
 fn keyboard_p1(keys: &ButtonInput<KeyCode>) -> Raw {
     let mut m = Vec2::ZERO;
-    if keys.pressed(KeyCode::KeyW) { m.y -= 1.0; }
-    if keys.pressed(KeyCode::KeyS) { m.y += 1.0; }
-    if keys.pressed(KeyCode::KeyA) { m.x -= 1.0; }
-    if keys.pressed(KeyCode::KeyD) { m.x += 1.0; }
+    if down(keys, KeyCode::KeyW) { m.y -= 1.0; }
+    if down(keys, KeyCode::KeyS) { m.y += 1.0; }
+    if down(keys, KeyCode::KeyA) { m.x -= 1.0; }
+    if down(keys, KeyCode::KeyD) { m.x += 1.0; }
     Raw {
         movement: m,
-        sprint: keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight),
-        flux: keys.pressed(KeyCode::Space),
-        manual: keys.pressed(KeyCode::ControlLeft),
-        pass: keys.pressed(KeyCode::KeyJ),
-        shoot: keys.pressed(KeyCode::KeyK),
-        lob: keys.pressed(KeyCode::KeyL),
-        through: keys.pressed(KeyCode::KeyI),
-        switch: keys.pressed(KeyCode::KeyQ),
-        special: keys.pressed(KeyCode::KeyU),
-        team_flux: keys.pressed(KeyCode::KeyY),
+        sprint: down(keys, KeyCode::ShiftLeft) || down(keys, KeyCode::ShiftRight),
+        flux: down(keys, KeyCode::Space),
+        manual: down(keys, KeyCode::ControlLeft),
+        pass: down(keys, KeyCode::KeyJ),
+        shoot: down(keys, KeyCode::KeyK),
+        lob: down(keys, KeyCode::KeyL),
+        through: down(keys, KeyCode::KeyI),
+        switch: down(keys, KeyCode::KeyQ),
+        special: down(keys, KeyCode::KeyU),
+        team_flux: down(keys, KeyCode::KeyY),
     }
 }
 
 fn keyboard_p2(keys: &ButtonInput<KeyCode>) -> Raw {
     let mut m = Vec2::ZERO;
-    if keys.pressed(KeyCode::ArrowUp) { m.y -= 1.0; }
-    if keys.pressed(KeyCode::ArrowDown) { m.y += 1.0; }
-    if keys.pressed(KeyCode::ArrowLeft) { m.x -= 1.0; }
-    if keys.pressed(KeyCode::ArrowRight) { m.x += 1.0; }
+    if down(keys, KeyCode::ArrowUp) { m.y -= 1.0; }
+    if down(keys, KeyCode::ArrowDown) { m.y += 1.0; }
+    if down(keys, KeyCode::ArrowLeft) { m.x -= 1.0; }
+    if down(keys, KeyCode::ArrowRight) { m.x += 1.0; }
     Raw {
         movement: m,
-        sprint: keys.pressed(KeyCode::Numpad0),
-        flux: keys.pressed(KeyCode::NumpadEnter),
-        manual: keys.pressed(KeyCode::NumpadDecimal),
-        pass: keys.pressed(KeyCode::Numpad1),
-        shoot: keys.pressed(KeyCode::Numpad2),
-        lob: keys.pressed(KeyCode::Numpad3),
-        through: keys.pressed(KeyCode::Numpad5),
-        switch: keys.pressed(KeyCode::Numpad4),
-        special: keys.pressed(KeyCode::Numpad6),
-        team_flux: keys.pressed(KeyCode::Numpad7),
+        sprint: down(keys, KeyCode::Numpad0),
+        flux: down(keys, KeyCode::NumpadEnter),
+        manual: down(keys, KeyCode::NumpadDecimal),
+        pass: down(keys, KeyCode::Numpad1),
+        shoot: down(keys, KeyCode::Numpad2),
+        lob: down(keys, KeyCode::Numpad3),
+        through: down(keys, KeyCode::Numpad5),
+        switch: down(keys, KeyCode::Numpad4),
+        special: down(keys, KeyCode::Numpad6),
+        team_flux: down(keys, KeyCode::Numpad7),
     }
+}
+
+fn gdown(g: &Gamepad, b: GamepadButton) -> bool {
+    g.pressed(b) || g.just_pressed(b)
 }
 
 fn gamepad_raw(g: &Gamepad) -> Raw {
@@ -118,16 +126,16 @@ fn gamepad_raw(g: &Gamepad) -> Raw {
     }
     Raw {
         movement: m,
-        sprint: g.pressed(GamepadButton::RightTrigger),
-        flux: g.pressed(GamepadButton::RightTrigger2),
-        manual: g.pressed(GamepadButton::LeftTrigger2),
-        pass: g.pressed(GamepadButton::South),
-        shoot: g.pressed(GamepadButton::West),
-        lob: g.pressed(GamepadButton::East),
-        through: g.pressed(GamepadButton::North),
-        switch: g.pressed(GamepadButton::LeftTrigger),
-        special: g.pressed(GamepadButton::DPadUp) || g.pressed(GamepadButton::RightThumb),
-        team_flux: g.pressed(GamepadButton::DPadDown) || g.pressed(GamepadButton::LeftThumb),
+        sprint: gdown(g, GamepadButton::RightTrigger),
+        flux: gdown(g, GamepadButton::RightTrigger2),
+        manual: gdown(g, GamepadButton::LeftTrigger2),
+        pass: gdown(g, GamepadButton::South),
+        shoot: gdown(g, GamepadButton::West),
+        lob: gdown(g, GamepadButton::East),
+        through: gdown(g, GamepadButton::North),
+        switch: gdown(g, GamepadButton::LeftTrigger),
+        special: gdown(g, GamepadButton::DPadUp) || gdown(g, GamepadButton::RightThumb),
+        team_flux: gdown(g, GamepadButton::DPadDown) || gdown(g, GamepadButton::LeftThumb),
     }
 }
 

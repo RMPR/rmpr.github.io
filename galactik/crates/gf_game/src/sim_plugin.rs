@@ -38,7 +38,7 @@ impl Plugin for SimPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<GameEvent>()
             .init_resource::<Paused>()
-            .add_systems(OnEnter(AppState::Match), start_match)
+            .add_systems(OnEnter(AppState::Match), start_match.in_set(crate::MatchSets::Init))
             .add_systems(OnExit(AppState::Match), end_match)
             .add_systems(FixedUpdate, step_sim.in_set(SimStep).run_if(in_state(AppState::Match)));
     }
@@ -50,6 +50,9 @@ fn start_match(mut commands: Commands, setup: Res<MatchSetup>, mut paused: ResMu
     human[setup.human_team] = true;
     if setup.two_players {
         human = [true, true];
+    }
+    if setup.spectate {
+        human = [false, false];
     }
     let seed = 1 + (setup.half_len_secs as u64) * 7 + setup.human_team as u64;
     let cfg = MatchConfig { half_len_secs: setup.half_len_secs, seed, difficulty: setup.difficulty, human };

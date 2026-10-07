@@ -12,7 +12,7 @@ pub struct ViewPlugin;
 
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Match), (spawn_pitch, spawn_actors).chain())
+        app.add_systems(OnEnter(AppState::Match), (spawn_pitch, spawn_actors).chain().in_set(crate::MatchSets::Spawn))
             .add_systems(Update, (sync_actors, sync_clouds, follow_camera).chain().run_if(in_state(AppState::Match)));
     }
 }

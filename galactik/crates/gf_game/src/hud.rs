@@ -1,6 +1,6 @@
 //! In-match HUD: score, clock, Flux charges, strain, banners.
 
-use crate::setup::hex;
+use crate::setup::{hex, team_ui_color};
 use crate::sim_plugin::{GameEvent, MatchRes, Paused};
 use crate::AppState;
 use bevy::prelude::*;
@@ -12,7 +12,7 @@ pub struct HudPlugin;
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Banner>()
-            .add_systems(OnEnter(AppState::Match), spawn_hud)
+            .add_systems(OnEnter(AppState::Match), spawn_hud.in_set(crate::MatchSets::Spawn))
             .add_systems(Update, (banner_from_events, update_hud, back_to_title).run_if(in_state(AppState::Match)));
     }
 }
@@ -105,7 +105,7 @@ fn spawn_hud(mut commands: Commands, m: Res<MatchRes>) {
             node.align_items = AlignItems::FlexEnd;
         }
         commands.spawn((node, scoped.clone())).with_children(|c| {
-            c.spawn((Text::new(def.name.clone()), font(18.0), TextColor(hex(&def.kit.primary))));
+            c.spawn((Text::new(def.name.clone()), font(18.0), TextColor(team_ui_color(&def.kit))));
             c.spawn((PoolLabel { team }, Text::new("Flux"), font(13.0), TextColor(Color::srgb(0.7, 0.8, 0.9))));
             c.spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(4.0), ..default() }).with_children(|c| {
                 for i in 0..3 {
@@ -177,7 +177,7 @@ fn banner_from_events(mut events: MessageReader<GameEvent>, m: Res<MatchRes>, ti
         match *e {
             SimEvent::Goal { team, scorer } => {
                 let t = &sim.teams[team].def;
-                banner.show(now, 3.0, "GOAL!", format!("{} — {}", sim.players[scorer].name, t.name), hex(&t.kit.primary));
+                banner.show(now, 3.0, "GOAL!", format!("{} - {}", sim.players[scorer].name, t.name), team_ui_color(&t.kit));
             }
             SimEvent::Foul { by, on, .. } => {
                 banner.show(now, 1.6, "FOUL", format!("{} on {}", sim.players[by].name, sim.players[on].name), Color::srgb(1.0, 0.75, 0.3));
@@ -187,12 +187,12 @@ fn banner_from_events(mut events: MessageReader<GameEvent>, m: Res<MatchRes>, ti
                 banner.show(now, 1.8, "FLUX DUEL", format!("{} beats {}", sim.players[winner].name, sim.players[loser].name), Color::srgb(1.0, 0.95, 0.5));
             }
             SimEvent::TeamFlux { team } => {
-                banner.show(now, 2.5, sim.team_flux_name(team).to_uppercase(), sim.teams[team].def.name.clone(), hex(&sim.teams[team].def.kit.primary));
+                banner.show(now, 2.5, sim.team_flux_name(team).to_uppercase(), sim.teams[team].def.name.clone(), team_ui_color(&sim.teams[team].def.kit));
             }
             SimEvent::FluxStart { player, action } => {
                 if banner.until < now + 0.2 {
                     let t = &sim.teams[sim.players[player].team].def;
-                    banner.show(now, 0.9, "", format!("{}: {}", sim.players[player].name, action.name()), hex(&t.kit.primary));
+                    banner.show(now, 0.9, "", format!("{}: {}", sim.players[player].name, action.name()), team_ui_color(&t.kit));
                 }
             }
             SimEvent::Burnout { player } => banner.show(now, 1.5, "", format!("{} is burned out", sim.players[player].name), Color::srgb(1.0, 0.5, 0.4)),
@@ -206,7 +206,7 @@ fn banner_from_events(mut events: MessageReader<GameEvent>, m: Res<MatchRes>, ti
                     Restart::Penalty => "PENALTY",
                     Restart::KickOff => "Kick-off",
                 };
-                banner.show(now, 1.2, "", format!("{} — {}", label, sim.teams[team].def.name), Color::srgb(0.8, 0.9, 1.0));
+                banner.show(now, 1.2, "", format!("{} - {}", label, sim.teams[team].def.name), Color::srgb(0.8, 0.9, 1.0));
             }
             SimEvent::HalfTime => banner.show(now, 3.0, "HALF TIME", "", Color::WHITE),
             SimEvent::FullTime => banner.show(now, 999.0, "FULL TIME", "Enter / Start to return to the title", Color::WHITE),
@@ -266,7 +266,7 @@ fn update_hud(
     for (ch, mut bg) in &mut charges {
         let ts = &sim.teams[ch.team];
         let fill = ((ts.pool - ch.index as f32 * CHARGE) / CHARGE).clamp(0.0, 1.0);
-        let col = hex(&ts.def.kit.primary);
+        let col = team_ui_color(&ts.def.kit);
         bg.0 = if fill >= 1.0 {
             col
         } else if fill > 0.0 {

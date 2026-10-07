@@ -8,7 +8,8 @@ pub struct TitlePlugin;
 
 impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Title), spawn_title)
+        app.add_systems(Startup, auto_start)
+            .add_systems(OnEnter(AppState::Title), spawn_title)
             .add_systems(Update, (title_input, update_title).run_if(in_state(AppState::Title)));
     }
 }
@@ -41,7 +42,7 @@ fn spawn_title(mut commands: Commands) {
             c.spawn((SetupText, Text::new(""), font(20.0), TextColor(hex("#ffe08a")), TextLayout::new(Justify::Center, LineBreak::WordBoundary)));
             c.spawn((
                 Text::new(
-                    "← / → or A / D : choose your team      T : two players      1 / 2 / 3 : 2, 3 or 5 minute halves      - / = : difficulty\n\nEnter or Start : kick off\n\n\
+                    "Left / Right or A / D : choose your team      T : two players      1 / 2 / 3 : 2, 3 or 5 minute halves      - / = : difficulty\n\nEnter or Start : kick off\n\n\
                      Hold Space (RT) with any action to use your Flux. Sprint = Breath Burst / Smog Step, shoot = Akillian Strike / Smog Shot,\n\
                      pass = Ice Lane / Veiled Pass, lob = High Breath / Phase Lob, tackle = Frost Lock / Smog Snatch. U = Super Jump / Eclipse Cloud.\n\
                      A full Flux pool unlocks the Team Flux (Y): Akillian Blizzard or Eclipse. Flux strains players; the Smog makes non-natives sick.",
@@ -102,4 +103,10 @@ fn update_title(setup: Res<MatchSetup>, mut q: Query<&mut Text, With<SetupText>>
         (setup.half_len_secs / 60.0).round() as u32,
         setup.difficulty * 100.0
     );
+}
+
+fn auto_start(setup: Res<MatchSetup>, mut next: ResMut<NextState<AppState>>) {
+    if setup.auto_match {
+        next.set(AppState::Match);
+    }
 }
