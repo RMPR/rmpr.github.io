@@ -454,3 +454,37 @@ html.dark .theme-toggle {
 
 // Syntax highlighting theme lives at the bottom to keep the top of the file readable
 @import "highlights";
+
+/**************/
+/* SHORT FORM */
+/**************/
+
+.shorts { max-width: $prose-width; }
+
+.short-item {
+  padding: var(--space-lg) 0;
+  border-bottom: 1px solid var(--border);
+
+  &:first-child { padding-top: 0; }
+}
+
+.short-item__date,
+.short .post-meta a {
+  font-family: $condensed;
+  font-size: 0.85rem;
+  color: var(--muted);
+  &:hover { color: var(--accent); text-decoration: none; }
+}
+
+.short__body {
+  margin-top: var(--space-sm);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  p { margin: 0 0 var(--space-sm); }
+  p:last-child { margin-bottom: 0; }
+  img { max-width: 100%; border-radius: 8px; }
+}
+
+.short .post-meta { margin-bottom: 0; }

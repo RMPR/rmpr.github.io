@@ -1,0 +1,17 @@
+---
+layout: default
+---
+
+<article class="prose short">
+  <div class="post-meta">
+    <a href="{{ site.baseurl }}{{ page.url }}"><time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %-d, %Y" }}</time></a>
+  </div>
+
+  <div class="short__body">
+    {{ content }}
+  </div>
+
+  <nav class="post-nav">
+    <a href="{{ site.baseurl }}/short/">&larr; All short form</a>
+  </nav>
+</article>

@@ -55,6 +55,27 @@ baseurl: ""
 
 permalink: /:title/
 
+# Short form content (micro-posts), published by postr.
+# Each file in _shorts/ becomes /short/<name>/ and is listed on /short/.
+collections:
+  shorts:
+    output: true
+    permalink: /short/:name/
+
+defaults:
+  - scope:
+      path: ""
+      type: shorts
+    values:
+      layout: short
+
+# jekyll-feed: keep the main feed for long-form posts only, and give
+# short form its own feed so the Bluesky feed bot doesn't pick it up.
+feed:
+  collections:
+    shorts:
+      path: "/short/feed.xml"
+
 # The release of Jekyll Now that you're using
 version: v1.2.0
 
