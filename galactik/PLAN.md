@@ -518,6 +518,21 @@ What exists in the repo today, against the milestones above:
 | 6 | Signatures & Team Flux | **Partial.** Both Team Flux ultimates (Akillian Blizzard, Eclipse) work with stadium-wide colour changes. The 15 per-player signature moves are defined in data but not yet implemented. No audio. |
 | 7 | Modes & polish         | **Partial.** Title screen with team choice, two-player toggle, half length and difficulty; pause; full-time screen. Cup mode, rebinding and the loading screen remain. |
 
+Verified so far:
+- `cargo test -p gf_core` passes, including a determinism test (same inputs
+  and seed give the same state hash after a minute of play) and a full
+  AI-vs-AI match sanity test. The headless example plays a six-minute match
+  in about a quarter of a second.
+- The native build renders and takes keyboard input under Xvfb with Mesa's
+  software Vulkan driver (`gf_game --match --ai` for a spectator match).
+- The WebGL2 bundle boots in headless Chromium, shows the title screen,
+  starts a match on Enter and responds to keyboard play.
+- The WebGPU bundle compiles and loads, but headless Chromium's software
+  WebGPU loses the device at start-up, so it has only been exercised up to
+  adapter creation here. Test it in a real browser.
+- Bundle size: about 18.6 MB of wasm after `wasm-opt -Oz` (7.2 MB gzipped),
+  within the 20 MB budget but worth trimming.
+
 Deviations from the plan, to revisit:
 - `gf_data` is a module inside `gf_core` rather than its own crate.
 - Particles are emissive sphere entities spawned from events rather than

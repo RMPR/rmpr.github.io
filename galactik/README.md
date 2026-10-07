@@ -26,6 +26,9 @@ cargo run -p gf_core --example headless --release -- <seed> <difficulty>
 
 # native desktop build (fast iteration)
 cargo run -p gf_game --release
+# dev flags: skip the title, watch AI vs AI, or play as the Shadows
+cargo run -p gf_game --release -- --match --ai
+cargo run -p gf_game --release -- --match --shadows
 
 # web build: needs the wasm32 target and trunk
 rustup target add wasm32-unknown-unknown
