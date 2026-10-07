@@ -1,6 +1,7 @@
 # Galactik Football — Design & Implementation Plan
 
-A browser-playable Galactik Football game written in Rust on top of **wgpu**, with
+A browser-playable Galactik Football game written in Rust with **Bevy** (rendering through
+wgpu), with
 PES-style football as the base layer and the Flux of each team woven into the
 controls rather than bolted on as cutscenes. First release ships two teams:
 the **Snow Kids** (the Breath of Akillian) and the **Shadows** (the Smog).
@@ -298,34 +299,44 @@ Both come with a stadium-wide VFX state and a music stinger, which is the
 ## 4. Technical architecture
 
 ### 4.1 Stack (versions as of October 2026)
-| Concern            | Choice                                                            |
-|--------------------|-------------------------------------------------------------------|
-| Language           | Rust stable, edition 2024                                          |
-| GPU                | `wgpu` 30.x — WebGPU on the web, WebGL2 fallback build (`webgl` feature) |
-| Windowing/input    | `winit` 0.30.x (0.31 once stable), `gilrs` for gamepads (works on wasm) |
-| Math               | `glam`                                                            |
-| ECS                | `hecs` (small, no scheduler magic; we own the loop)               |
-| Assets             | glTF 2.0 via `gltf` crate, PNG via `image`, data in RON via `ron`+`serde` |
-| Audio              | `kira` (web backend through `cpal`/`web-sys`)                     |
-| UI                 | `egui` + `egui-wgpu` for menus/debug; in-match HUD drawn by our own 2D sprite pass |
-| Logging            | `log` + `console_log` on web, `env_logger` native                 |
-| Web glue           | `wasm-bindgen`, `web-sys`, `wasm-bindgen-futures`                 |
-| Build              | `trunk` 0.21.x for the web, plain `cargo run` native for iteration |
-| Tests              | `cargo test` on sim crate; headless determinism tests             |
+| Concern            | Choice                                                                 |
+|--------------------|------------------------------------------------------------------------|
+| Language           | Rust stable, edition 2024                                               |
+| Engine             | **Bevy 0.19.x** (0.20 is at release candidate; migrate once stable). Bevy renders through wgpu, so the browser story is WebGPU first with a WebGL2 build via Bevy's `webgl2` feature |
+| Math               | `glam` (re-exported by Bevy)                                            |
+| ECS / scheduling   | Bevy ECS. The football simulation runs as **one chained system set** in `FixedUpdate` so ordering is explicit and deterministic |
+| Rendering          | Bevy PBR pipeline with a cel-shading `ExtendedMaterial` on top of `StandardMaterial`, built-in bloom, built-in skinned meshes, Fullscreen Material for the outline post pass |
+| Animation          | `bevy_animation` + `bevy_gltf` with `AnimationGraph` for blend trees and one-shot layers |
+| Particles          | `bevy_hanabi` 0.19 (GPU particles for frost and smoke; falls back to CPU-side mesh instancing on WebGL2 where compute is unavailable) |
+| Input              | Bevy's `ButtonInput`/`Gamepads` wrapped by `bevy_enhanced_input` 0.26 for action maps, rebinding and per-player contexts |
+| Audio              | `bevy_audio` (built in, vorbis). Swap for `bevy_kira_audio` only if mixing buses prove necessary |
+| Menus / debug UI   | `bevy_ui` for in-game HUD and menus; `bevy_egui` 0.42 for the tuning panel and dev tools; `bevy_dev_tools` for FPS overlay |
+| Data               | RON via `ron` + `serde`, loaded through Bevy's `AssetServer` with a custom `AssetLoader` for team and Flux files |
+| Build (web)        | `trunk` 0.21.x with `wasm-bindgen`; `wasm-opt -Oz` in release                 |
+| Build (native)     | plain `cargo run` with Bevy's `dynamic_linking` feature for fast iteration    |
+| Tests              | `cargo test` on `gf_core`; headless Bevy `MinimalPlugins` app for integration and determinism tests |
 
 Native desktop build is kept working at all times — it is the fast iteration
-path and the way to run the sim under a debugger.
+path, the debugger path, and where the tuning panel lives.
 
 ### 4.2 Workspace layout
 ```
 galactik/
   Cargo.toml                 # workspace
   crates/
-    gf_core/                 # pure game simulation, no wgpu, no winit
+    gf_core/                 # pure game simulation: NO bevy dependency except glam
       src/ball.rs, player.rs, pitch.rs, rules.rs, ai/, flux/, input.rs, sim.rs
-    gf_data/                 # loading RON team/player/flux definitions, stat types
-    gf_render/               # wgpu renderer: mesh, skinning, cel shader, vfx, hud
-    gf_app/                  # winit loop, platform glue, audio, menus (egui), state machine
+    gf_data/                 # RON schema types for teams, players, Flux actions
+    gf_game/                 # Bevy app: plugins below
+      src/
+        main.rs              # App builder, platform setup, state machine (Title/Menu/Match/Replay)
+        sim_plugin.rs        # FixedUpdate: gather InputFrames -> gf_core::Sim::step -> write back
+        view_plugin.rs       # Update: interpolate sim state into Transforms, camera, animation drive
+        render/              # cel material, outline fullscreen material, holo pitch shader, bloom config
+        vfx/                 # hanabi effect assets for Breath and Smog, duel camera, Team Flux stadium state
+        audio_plugin.rs
+        ui/                  # HUD (bevy_ui), menus, egui tuning panel (native/dev only)
+        assets_plugin.rs     # RON asset loaders, loading state, lazy team loading
   assets/
     teams/snow_kids.ron, teams/shadows.ron
     flux/breath.ron, flux/smog.ron
@@ -333,86 +344,108 @@ galactik/
     shaders/*.wgsl
   web/
     index.html, Trunk.toml, style.css
-  tools/
-    asset_bake.rs            # optional: glTF → compact binary, mipmaps
   PLAN.md                    # this file
 ```
 
-`gf_core` has zero platform dependencies, compiles on native and wasm, and is
-fully deterministic given an input stream: this enables replays, regression
-tests of the Flux rules, and (later) rollback netplay.
+`gf_core` stays engine-free and deterministic given an input stream. Bevy
+never owns game state: the ECS holds a single `Res<MatchSim>` resource
+wrapping `gf_core::Sim`, plus view-side entities (meshes, animation players,
+particles) that mirror it. That keeps replays, regression tests of the Flux
+rules and later rollback netplay possible, and it means swapping engines
+again would cost one crate, not the game.
 
-### 4.3 Main loop
+### 4.3 Main loop (Bevy schedules)
 ```
-accumulator += frame_dt
-while accumulator >= 1/60:
-    inputs = gather(gamepads, keyboard, ai)
-    sim.step(inputs)            # gf_core, fixed step
-    accumulator -= 1/60
-alpha = accumulator * 60
-render.draw(sim.interpolated(alpha))
+FixedUpdate  @ 60 Hz  (Time<Fixed>)         Update (render rate)
+  gather_inputs      -> Vec<InputFrame>       interpolate_view   (prev/curr sim state, Time<Fixed>::overstep_fraction)
+  step_sim           -> MatchSim.step()       drive_animation    (locomotion speed/dir, one-shot events)
+  emit_sim_events    -> EventWriter<SimEvent> camera_follow      (broadcast cam, duel cut)
+                                              hud_update
 ```
-Rendering interpolates between the last two sim states, so the render rate
-is decoupled from the 60 Hz sim (important on 120 Hz displays and on slow
-tabs).
+The three `FixedUpdate` systems are `.chain()`ed so they are never
+reordered or parallelised. `SimEvent` (kick, goal, foul, flux_start,
+duel, ...) is the only channel from sim to presentation: VFX, audio, camera
+and HUD all react to events, never read sim internals directly. The
+`step_sim` system is pure and takes an input slice, so a replay is the
+same system fed from a file.
 
 ### 4.4 Renderer
-- Forward renderer, single HDR colour target + depth, then post-process
-  (bloom for Flux emissives, tonemap, FXAA) → swapchain.
-- Passes: shadow map (one directional light, 2048²) → opaque (cel-lit skinned
-  and static meshes) → outline (inverted-hull or depth/normal edge) →
-  transparent VFX (frost trails, smoke, holo walls) → post → HUD.
-- Skinning on the GPU: joint matrices in a storage buffer (WebGPU) or uniform
-  array (WebGL2 path, ≤64 joints).
-- Instancing for crowd billboards and pitch props.
-- VFX: GPU particle system (compute on WebGPU, CPU-updated vertex buffer on
-  WebGL2) for Breath frost and Smog smoke; ribbon trails for the ball.
-- Materials: one über-shader `cel.wgsl` with flags (skinned, emissive, flux
-  tint) to keep pipeline count tiny.
-- Resolution scale slider; dynamic resolution if a frame exceeds 20 ms.
+- Bevy's standard 3D pipeline (HDR, tonemapping, built-in bloom for Flux
+  emissives, MSAA 4× on native, FXAA on web).
+- **Cel shading** as an `ExtendedMaterial<StandardMaterial, CelExtension>`:
+  a small WGSL fragment that quantises the lighting term into 2–3 bands and
+  adds a rim light tinted by the player's Flux colour. One material type for
+  players, kit and stadium, with per-instance uniforms for flux tint and
+  intensity.
+- **Outlines** via a Fullscreen Material post pass (depth and normal edge
+  detection); inverted hull as the WebGL2 fallback.
+- Holographic pitch and side walls: unlit emissive materials with a scrolling
+  grid texture and fresnel alpha.
+- One directional light with cascaded shadow maps (2 cascades), ambient from
+  a flat environment colour.
+- Crowd: instanced billboards (Bevy auto-instances identical mesh/material).
+- VFX: `bevy_hanabi` effects (frost trail, Breath burst ring, Smog puff,
+  Eclipse fog volume as a big soft particle cloud), ball ribbon trail via a
+  dynamic mesh.
+- Resolution scale through the camera's `Viewport` and a `RenderTarget`
+  with upscale on slow frames.
 
 ### 4.5 Animation
-- Skeleton + clips from glTF; linear blend trees per locomotion state
-  (idle/walk/jog/sprint, 8-direction strafe), one-shot layers for kicks,
-  tackles, headers, keeper dives, Flux poses.
-- IK is out of scope at launch except a simple foot-to-ball look-at for kicks.
-- One shared humanoid rig for all 18 players; per-player meshes/textures only.
+- Shared humanoid rig for all 18 players; clips loaded from glTF through
+  `bevy_gltf` into one `AnimationGraph` per player entity.
+- Blend nodes: locomotion (idle/walk/jog/sprint × 8-direction strafe) driven
+  by sim velocity; additive upper-body layer for looking at the ball; one-shot
+  nodes for kicks, tackles, headers, dives, Flux poses, celebrations, each
+  triggered by a `SimEvent`.
+- Foot-to-ball alignment is a small transform tweak on the kicking foot
+  bone in `drive_animation`; no IK solver at launch.
 
 ### 4.6 Physics
-Hand-rolled in `gf_core`: ball integrator with Magnus; capsule-vs-capsule
-player separation; capsule-vs-ball kick/contact; posts and crossbar as
-cylinders; pitch plane and holographic side walls (ball out of play is still
-a rule, the walls are only visual). No general physics engine needed.
+Hand-rolled inside `gf_core` exactly as before: ball integrator with Magnus,
+capsule separation, kick contacts, posts as cylinders. No `avian` or
+`bevy_rapier`: the pitch is a plane, the entities are capsules and one
+sphere, and determinism across browsers matters more than a general solver.
+Bevy only ever receives resulting positions.
 
 ### 4.7 Input
-`winit` keyboard, `gilrs` gamepads (wasm support via the Gamepad API).
-Input is sampled into an `InputFrame` struct per player per tick, which is
-all the sim ever sees, so AI and replays feed the same struct.
+`bevy_enhanced_input` action contexts: `OnPitch`, `Defending`, `Menu`. One
+context instance per local player bound to a gamepad id or the keyboard.
+Each tick `gather_inputs` reads the action values into an `InputFrame`
+struct per slot; AI fills the remaining slots. The sim never sees Bevy input
+types.
 
 ### 4.8 Audio
-`kira` with a small mixer: music bus, SFX bus, crowd bus. Web autoplay rules
-require a user gesture before the AudioContext starts: the title screen's
-"Press any key" handles it.
+`bevy_audio` with vorbis assets. Three logical groups (music, SFX, crowd)
+with volumes stored in a settings resource. Web autoplay rules require a
+user gesture before the audio context starts; the title screen's
+"Press any key" handles it. Flux sounds are triggered from `SimEvent`s.
 
 ### 4.9 Web deployment inside this Jekyll site
 - The game lives in `galactik/` of this repo and is published at
   `https://rmpr.xyz/galactik/`.
 - `trunk build --release` outputs to `galactik/dist/`. A GitHub Actions
-  workflow builds the wasm on push to `master` and commits `galactik/dist/`
-  (or uploads it as a Pages artifact if the site moves to the Actions-based
-  Pages deploy). Jekyll copies any non-underscore folder as static files, so
-  `dist/` is served as-is.
-- Add `galactik/crates`, `galactik/assets/src`, `galactik/target`,
-  `galactik/Cargo.*` to the Jekyll `exclude` list so the site build stays fast
-  and does not ship sources.
-- `wasm-opt -Oz` and brotli via GitHub Pages' default gzip; budget: ≤ 4 MB
-  wasm, ≤ 25 MB total assets, with the stadium and teams lazy-loaded after
-  the title screen.
-- No threads/SharedArrayBuffer at launch (no COOP/COEP headers on GitHub
-  Pages). Keep everything single-threaded; the sim is cheap.
-- Feature flags: `--features webgpu` default build; a second
-  `--features webgl` build served from `galactik/gl/` for browsers without
-  WebGPU (the loader page picks based on `navigator.gpu`).
+  workflow builds the wasm on push to `master`, runs `wasm-opt -Oz`, and
+  commits `galactik/dist/` (or uploads a Pages artifact if the site moves to
+  the Actions-based Pages deploy). Jekyll copies any non-underscore folder as
+  static files, so `dist/` is served as-is.
+- Add `galactik/crates`, `galactik/assets`, `galactik/target`,
+  `galactik/Cargo.*` to the Jekyll `exclude` list; only `galactik/dist` ships.
+- Release profile: `opt-level = "z"`, `lto = "fat"`, `codegen-units = 1`,
+  `panic = "abort"`, Bevy with `default-features = false` and only the
+  feature collections needed (`3d`, `ui`, `animation`, `bevy_gltf`,
+  `bevy_audio`, `vorbis`, `png`, `webgpu`/`webgl2`). Expected wasm:
+  **12–18 MB raw, 4–6 MB gzipped**, which GitHub Pages serves compressed.
+  Budget: ≤ 20 MB raw wasm, ≤ 25 MB assets, teams and stadium loaded after
+  the title screen behind Bevy's `LoadingState`.
+- No threads at launch: GitHub Pages cannot send the COOP/COEP headers that
+  `SharedArrayBuffer` needs, so Bevy runs its schedule single-threaded on
+  wasm (this is its default there).
+- Two builds: `--features webgpu` as the default at `galactik/`, and a
+  `--features webgl2` build at `galactik/gl/`. The loader page checks
+  `navigator.gpu` and picks one. Hanabi compute effects and cascaded shadows
+  are disabled by a `GpuCaps` resource on the WebGL2 build.
+- Bevy's asset loading on the web goes over `fetch`; keep assets under
+  `galactik/dist/assets/` and set `AssetPlugin::file_path` accordingly.
 
 ---
 
@@ -442,15 +475,19 @@ Rough effort assumes evenings/weekends.
 
 | # | Milestone              | Deliverable                                                                                  | Est.   |
 |---|------------------------|----------------------------------------------------------------------------------------------|--------|
-| 0 | Skeleton               | Workspace, winit + wgpu triangle on native and `trunk serve`, GitHub Pages deploy at `/galactik/`, CI | 1 wk  |
-| 1 | Pitch & ball           | Camera, holographic pitch, ball physics with kicks from a capsule "player", debug HUD, deterministic sim tests | 2 wk |
-| 2 | One player PES feel    | Movement model, dribbling, sprint, first touch, shooting, keeper AI; tuning harness with sliders (egui) | 3 wk |
-| 3 | Full 7v7               | Passing types, tackles, fouls, dead balls, team AI formations and roles, player switching, clock, score, 2P local | 4 wk |
-| 4 | Flux core              | Flux pool, strain, modifier mapping for both teams' basic Flux actions, duels, Flux VFX v1 | 3 wk |
-| 5 | Characters & animation | Shared rig, skinning pipeline, animation state machine, 18 player looks, cel shading + outline, stadium model | 4 wk |
+| 0 | Skeleton               | Workspace, Bevy app with a lit cube on native and `trunk serve`, GitHub Pages deploy at `/galactik/`, CI with wasm-opt, size report | 1 wk |
+| 1 | Pitch & ball           | Broadcast camera, holographic pitch material, `gf_core` ball physics driven from `FixedUpdate`, kicks from a capsule "player", debug overlay, deterministic sim tests | 2 wk |
+| 2 | One player PES feel    | Movement model, dribbling, sprint, first touch, shooting, keeper AI; egui tuning panel with live sliders over `gf_core` constants | 3 wk |
+| 3 | Full 7v7               | Passing types, tackles, fouls, dead balls, team AI formations and roles, player switching, clock, score, 2P local via input contexts | 4 wk |
+| 4 | Flux core              | Flux pool, strain, modifier mapping for both teams' basic Flux actions, duels, Flux VFX v1 with hanabi | 3 wk |
+| 5 | Characters & animation | Shared rig in glTF, `AnimationGraph` locomotion + one-shots, 18 player looks, cel material + outline pass, stadium model | 2 wk |
 | 6 | Signatures & Team Flux | All 15 signatures, Akillian Blizzard, Eclipse, duel camera, replays, audio | 3 wk |
-| 7 | Modes & polish         | Menus, Cup mode, options, difficulty, performance pass (WebGL2 path), loading screen, bug bash | 3 wk |
+| 7 | Modes & polish         | `bevy_ui` menus, Cup mode, options and rebinding, difficulty, WebGL2 build and `GpuCaps`, loading screen, bug bash | 3 wk |
 | 8 | Release 1.0            | Published at rmpr.xyz/galactik with a blog post; tag `v1.0`                                    | —      |
+
+Milestone 5 shrinks from four weeks to two compared with the raw-wgpu plan:
+glTF skinning, the animation graph and bloom come with Bevy. Milestone 0 and
+7 absorb the extra web-build work (feature trimming, size, two builds).
 
 Later (not planned in detail): more teams (Wambas, Xenons, Rykers, Pirates,
 Lightnings, Cyclops, Elektras), online play via rollback (the deterministic
@@ -460,33 +497,41 @@ core is built for it), mixed-flux "Paradisia" mode.
 - Native and web builds run; web build ≥ 60 fps on an integrated-GPU laptop
   in Chrome and Firefox, ≥ 30 fps on the WebGL2 path.
 - `cargo test` green; a 10-minute recorded input replay re-simulates to the
-  same final state hash (determinism guard).
+  same final state hash (determinism guard), run in a headless
+  `MinimalPlugins` app in CI.
 - `cargo clippy -- -D warnings` clean.
+- Release wasm size printed in CI and under budget.
 
 ---
 
 ## 7. Key risks and the plan for each
 | Risk | Mitigation |
 |------|------------|
-| Character art pipeline is the biggest time sink | Shared rig + Mixamo clips; accept placeholder capsules through M4; 18 looks are texture variants of one mesh |
+| Wasm size on a static host | Trim Bevy features from day one (M0 prints the size), `opt-level = "z"`, `wasm-opt -Oz`, lazy team/stadium loading; if it still exceeds 20 MB raw, drop `bevy_hanabi` on web for a hand-rolled instanced particle mesh |
+| Bevy breaking releases every ~3–4 months | Pin to 0.19 for the whole build; migrate only at milestone boundaries, and only when `bevy_hanabi`, `bevy_egui` and `bevy_enhanced_input` have all caught up |
+| Determinism inside an ECS scheduler | Sim lives in one `Res<MatchSim>` stepped by one chained system; no sim logic in queries; `Time<Fixed>` only. The determinism test guards it |
+| Character art pipeline is still the biggest art time sink | Shared rig + Mixamo clips; placeholder capsules through M4; 18 looks are texture variants of one mesh |
 | Flux feels like a win button | Duels, strain and the Smog sickness are in M4, before any art polish, so balance is tuned on gameplay alone |
-| WebGL2 fallback drags the renderer down | Design for WebGPU, gate compute particles and storage-buffer skinning behind a capability struct; WebGL2 path gets CPU particles and fewer joints |
-| Download size on a static host | Lazy load per team, KTX2/basis later if PNGs exceed budget, `wasm-opt -Oz` |
-| Floating-point determinism across browsers | Sim avoids `sin/cos` from platform libm in hot paths (use own approximations) and never reads wall-clock; tests hash state each tick |
+| WebGL2 fallback drags the renderer down | `GpuCaps` resource gates compute particles, cascades and the fullscreen outline; the fallback is inverted hull and CPU particles |
+| Floating-point determinism across browsers | Sim avoids platform libm `sin/cos` in hot paths (own approximations), never reads wall-clock; tests hash state each tick |
 | Scope creep into "all 8 teams" | Launch is two teams by decision; the data-driven Flux tables make more teams additive, not structural |
 
 ---
 
 ## 8. Decisions already made (so they are not re-argued later)
-1. Custom engine on raw wgpu, not Bevy. Bevy on wasm pulls a large binary and
-   its scheduler hides the fixed-step/determinism we want; the game is small
-   enough that owning the loop is cheaper.
-2. Deterministic `gf_core` with no platform dependencies, from day one.
+1. **Bevy 0.19** as the engine, chosen for time to first playable (glTF,
+   skinning, animation graph, bloom, UI and the web build all come for
+   free) and accepting a larger wasm binary in exchange.
+2. The simulation (`gf_core`) is engine-free and deterministic from day one,
+   and Bevy never owns match state. It is stepped by one chained system in
+   `FixedUpdate` and talks to presentation only through `SimEvent`s.
 3. Flux is a held modifier on existing actions; no separate command menu.
 4. Team Flux economy is shared, strain is per player.
 5. No offside by default; 7v7 on a 60×40 m pitch.
 6. Cel-shaded look matching the series, not realism.
 7. Two teams at launch; data-driven so more teams are content, not code.
+8. Pin Bevy and its plugins for the whole 1.0 cycle; migrate at milestone
+   boundaries only.
 
 ---
 
@@ -551,39 +596,68 @@ and aim code.
 ## Appendix C — Workspace `Cargo.toml` sketch
 ```toml
 [workspace]
-members = ["crates/gf_core", "crates/gf_data", "crates/gf_render", "crates/gf_app"]
+members = ["crates/gf_core", "crates/gf_data", "crates/gf_game"]
 resolver = "3"
 
 [workspace.dependencies]
-wgpu = { version = "30", default-features = false, features = ["wgsl"] }
-winit = "0.30"
-glam = { version = "0.34", features = ["serde"] }
-hecs = "0.11"
-gltf = "1"
-image = { version = "0.25", default-features = false, features = ["png"] }
+bevy = { version = "0.19", default-features = false }
+glam = { version = "0.30", features = ["serde"] }   # match the glam Bevy 0.19 re-exports
 ron = "0.12"
 serde = { version = "1", features = ["derive"] }
-kira = "0.12"
-gilrs = "0.11"
-egui = "0.36"
-egui-wgpu = "0.36"   # pin to whichever egui release tracks wgpu 30
+bevy_hanabi = { version = "0.19", default-features = false, features = ["3d"] }
+bevy_enhanced_input = "0.26"
+bevy_egui = "0.42"
 log = "0.4"
-bytemuck = { version = "1", features = ["derive"] }
+
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 3
 
 [profile.release]
-opt-level = "s"
+opt-level = "z"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
+strip = true
 ```
-`gf_app` enables `wgpu/webgpu` by default and `wgpu/webgl` under a
-`webgl` feature; on the web it adds `wasm-bindgen`, `web-sys`,
-`console_error_panic_hook`, `console_log`.
+
+`crates/gf_game/Cargo.toml`:
+```toml
+[dependencies]
+bevy = { workspace = true, features = [
+    "3d", "ui", "animation", "bevy_gltf", "bevy_audio", "vorbis", "png",
+    "bevy_state", "bevy_window", "bevy_winit", "multi_threaded",
+] }
+gf_core = { path = "../gf_core" }
+gf_data = { path = "../gf_data" }
+bevy_hanabi.workspace = true
+bevy_enhanced_input.workspace = true
+ron.workspace = true
+serde.workspace = true
+
+[features]
+default = ["webgpu"]
+webgpu = ["bevy/webgpu"]
+webgl2 = ["bevy/webgl2"]
+dev = ["bevy/dynamic_linking", "bevy/bevy_dev_tools", "dep:bevy_egui"]
+
+[dependencies.bevy_egui]
+workspace = true
+optional = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+```
+`gf_core` depends on `glam`, `serde` and `gf_data` only, never on `bevy`.
 
 ## Appendix D — Sources consulted
 - Galactik Football wiki (Fandom): Snow Kids, The Shadows, The Smog, Sinedd.
 - Wikipedia: Galactik Football (7-a-side, Flux, seasons overview).
 - Inazuma Eleven Strikers reviews for the gauge / special-move structure.
 - PES 2021 controls guides for the control scheme and super cancel.
-- crates.io for `wgpu` 30.0.1, `winit` 0.30.13, `trunk` 0.21.14 (Oct 2026).
-- wgpu docs, "platforms/web": WebGPU vs WebGL2 feature builds.
+- crates.io for `bevy` 0.19.1, `bevy_hanabi` 0.19.0, `bevy_egui` 0.42.0,
+  `bevy_enhanced_input` 0.26.0, `trunk` 0.21.14 (Oct 2026).
+- Bevy 0.18 release notes (Fullscreen Materials, feature collections) and
+  the 0.18 → 0.19 migration guide.
