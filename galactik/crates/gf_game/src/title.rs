@@ -39,7 +39,7 @@ fn spawn_title(mut commands: Commands) {
         .with_children(|c| {
             c.spawn((Text::new("GALACTIK FOOTBALL"), font(64.0), TextColor(hex("#9ad7ff"))));
             c.spawn((Text::new("Snow Kids  vs  Shadows"), font(26.0), TextColor(Color::WHITE)));
-            c.spawn((SetupText, Text::new(""), font(20.0), TextColor(hex("#ffe08a")), TextLayout::new(Justify::Center, LineBreak::WordBoundary)));
+            c.spawn((SetupText, Text::new(""), font(20.0), TextColor(hex("#ffe08a")), TextLayout::justify(Justify::Center)));
             c.spawn((
                 Text::new(
                     "Left / Right or A / D : choose your team      T : two players      1 / 2 / 3 : 2, 3 or 5 minute halves      - / = : difficulty\n\nEnter or Start : kick off\n\n\
@@ -49,7 +49,7 @@ fn spawn_title(mut commands: Commands) {
                 ),
                 font(15.0),
                 TextColor(Color::srgb(0.75, 0.8, 0.9)),
-                TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+                TextLayout::justify(Justify::Center),
             ));
         });
 }

@@ -8,7 +8,7 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
-glam = { version = "0.32", features = ["serde"] }
+glam = { version = "0.33", features = ["serde"] }
 ron = "0.12"
 serde = { version = "1", features = ["derive"] }
 log = "0.4"

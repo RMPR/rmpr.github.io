@@ -1,6 +1,6 @@
 # Galactik Football
 
-A browser Galactik Football game in Rust with Bevy. PES-style 7-a-side
+A browser Galactik Football game in Rust with Bevy 0.20 (rustc 1.97.1 or newer). PES-style 7-a-side
 football with each team's Flux woven into the controls. Two teams at launch:
 the Snow Kids (the Breath of Akillian) and the Shadows (the Smog).
 

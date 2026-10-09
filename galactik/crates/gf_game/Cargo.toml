@@ -8,7 +8,7 @@ description = "Bevy front end for Galactik Football"
 [dependencies]
 gf_core = { path = "../gf_core" }
 log.workspace = true
-bevy = { version = "0.19", default-features = false, features = [
+bevy = { version = "0.20", default-features = false, features = [
     "3d", "ui", "bevy_state", "bevy_text", "default_font", "bevy_log",
     "bevy_winit", "keyboard", "gamepad", "bevy_gilrs", "bevy_gizmos",
     "multi_threaded", "async_executor", "std", "tonemapping_luts",
@@ -21,7 +21,7 @@ webgl2 = ["bevy/webgl2"]
 dev = ["bevy/dynamic_linking", "bevy/bevy_dev_tools"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-bevy = { version = "0.19", default-features = false, features = ["x11"] }
+bevy = { version = "0.20", default-features = false, features = ["x11"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"

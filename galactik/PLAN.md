@@ -301,12 +301,12 @@ Both come with a stadium-wide VFX state and a music stinger, which is the
 | Concern            | Choice                                                                 |
 |--------------------|------------------------------------------------------------------------|
 | Language           | Rust stable, edition 2024                                               |
-| Engine             | **Bevy 0.19.x** (0.20 is at release candidate; migrate once stable). Bevy renders through wgpu, so the browser story is WebGPU first with a WebGL2 build via Bevy's `webgl2` feature |
+| Engine             | **Bevy 0.20.x** (ported from 0.19 in October 2026; needs rustc 1.97.1 or newer). Bevy renders through wgpu, so the browser story is WebGPU first with a WebGL2 build via Bevy's `webgl2` feature |
 | Math               | `glam` (re-exported by Bevy)                                            |
 | ECS / scheduling   | Bevy ECS. The football simulation runs as **one chained system set** in `FixedUpdate` so ordering is explicit and deterministic |
 | Rendering          | Bevy PBR pipeline with a cel-shading `ExtendedMaterial` on top of `StandardMaterial`, built-in bloom, built-in skinned meshes, Fullscreen Material for the outline post pass |
 | Animation          | `bevy_animation` + `bevy_gltf` with `AnimationGraph` for blend trees and one-shot layers |
-| Particles          | `bevy_hanabi` 0.19 (GPU particles for frost and smoke; falls back to CPU-side mesh instancing on WebGL2 where compute is unavailable) |
+| Particles          | `bevy_hanabi` (once a 0.20-compatible release exists; GPU particles for frost and smoke; falls back to CPU-side mesh instancing on WebGL2 where compute is unavailable) |
 | Input              | Bevy's `ButtonInput`/`Gamepads` wrapped by `bevy_enhanced_input` 0.26 for action maps, rebinding and per-player contexts |
 | Audio              | `bevy_audio` (built in, vorbis). Swap for `bevy_kira_audio` only if mixing buses prove necessary |
 | Menus / debug UI   | `bevy_ui` for in-game HUD and menus; `bevy_egui` 0.42 for the tuning panel and dev tools; `bevy_dev_tools` for FPS overlay |
@@ -509,7 +509,7 @@ What exists in the repo today, against the milestones above:
 
 | # | Milestone              | Status                                                                                         |
 |---|------------------------|------------------------------------------------------------------------------------------------|
-| 0 | Skeleton               | **Done.** Workspace, Bevy 0.19 app, trunk web build, GitHub Actions workflow that tests the sim, builds the WebGPU and WebGL2 bundles and commits them to `galactik/dist`. |
+| 0 | Skeleton               | **Done.** Workspace, Bevy 0.20 app, trunk web build, GitHub Actions workflow that tests the sim, builds the WebGPU and WebGL2 bundles and commits them to `galactik/dist`. |
 | 1 | Pitch & ball           | **Done.** Holographic pitch, goals with posts and crossbar, ball physics with drag, Magnus curl, bounce and rolling friction; deterministic sim with a hash test. |
 | 2 | One player PES feel    | **Done** (first pass). Acceleration-limited movement, sprint knock-on, heavy first touch, assisted and manual passes, power/finesse shots, keeper AI with reaction, dives, catches and parries. No egui tuning panel yet; constants are in `gf_core`. |
 | 3 | Full 7v7               | **Done** (first pass). Ground/lob/through passes, standing and slide tackles, fouls with free kicks and penalties, corners, goal kicks, re-entries, halves and kick-offs, formation AI with pressing and zonal marking, player switching, two local players. |
@@ -547,7 +547,7 @@ Deviations from the plan, to revisit:
 | Risk | Mitigation |
 |------|------------|
 | Wasm size on a static host | Trim Bevy features from day one (M0 prints the size), `opt-level = "z"`, `wasm-opt -Oz`, lazy team/stadium loading; if it still exceeds 20 MB raw, drop `bevy_hanabi` on web for a hand-rolled instanced particle mesh |
-| Bevy breaking releases every ~3–4 months | Pin to 0.19 for the whole build; migrate only at milestone boundaries, and only when `bevy_hanabi`, `bevy_egui` and `bevy_enhanced_input` have all caught up |
+| Bevy breaking releases every ~3–4 months | Pin to 0.20 for the whole build; migrate only at milestone boundaries, and only when `bevy_hanabi`, `bevy_egui` and `bevy_enhanced_input` have all caught up. The 0.19 to 0.20 port touched three lines (Tonemapping import, TextLayout constructor, glam 0.33) |
 | Determinism inside an ECS scheduler | Sim lives in one `Res<MatchSim>` stepped by one chained system; no sim logic in queries; `Time<Fixed>` only. The determinism test guards it |
 | Character art pipeline is still the biggest art time sink | Shared rig + Mixamo clips; placeholder capsules through M4; 18 looks are texture variants of one mesh |
 | Flux feels like a win button | Duels, strain and the Smog sickness are in M4, before any art polish, so balance is tuned on gameplay alone |
@@ -558,7 +558,7 @@ Deviations from the plan, to revisit:
 ---
 
 ## 8. Decisions already made (so they are not re-argued later)
-1. **Bevy 0.19** as the engine, chosen for time to first playable (glTF,
+1. **Bevy 0.20** as the engine, chosen for time to first playable (glTF,
    skinning, animation graph, bloom, UI and the web build all come for
    free) and accepting a larger wasm binary in exchange.
 2. The simulation (`gf_core`) is engine-free and deterministic from day one,
@@ -639,11 +639,11 @@ members = ["crates/gf_core", "crates/gf_data", "crates/gf_game"]
 resolver = "3"
 
 [workspace.dependencies]
-bevy = { version = "0.19", default-features = false }
-glam = { version = "0.30", features = ["serde"] }   # match the glam Bevy 0.19 re-exports
+bevy = { version = "0.20", default-features = false }
+glam = { version = "0.33", features = ["serde"] }   # match the glam Bevy 0.20 re-exports
 ron = "0.12"
 serde = { version = "1", features = ["derive"] }
-bevy_hanabi = { version = "0.19", default-features = false, features = ["3d"] }
+bevy_hanabi = { version = "*", default-features = false, features = ["3d"] }  # pin to the 0.20-compatible release
 bevy_enhanced_input = "0.26"
 bevy_egui = "0.42"
 log = "0.4"
@@ -696,7 +696,7 @@ console_error_panic_hook = "0.1"
 - Wikipedia: Galactik Football (7-a-side, Flux, seasons overview).
 - Inazuma Eleven Strikers reviews for the gauge / special-move structure.
 - PES 2021 controls guides for the control scheme and super cancel.
-- crates.io for `bevy` 0.19.1, `bevy_hanabi` 0.19.0, `bevy_egui` 0.42.0,
+- crates.io for `bevy` 0.20.0, `bevy_hanabi` 0.19.0, `bevy_egui` 0.42.0,
   `bevy_enhanced_input` 0.26.0, `trunk` 0.21.14 (Oct 2026).
 - Bevy 0.18 release notes (Fullscreen Materials, feature collections) and
-  the 0.18 → 0.19 migration guide.
+  the 0.18 → 0.19 and 0.19 → 0.20 migration guides.

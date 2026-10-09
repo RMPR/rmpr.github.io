@@ -156,8 +156,8 @@ fn spawn_hud(mut commands: Commands, m: Res<MatchRes>) {
             scoped.clone(),
         ))
         .with_children(|c| {
-            c.spawn((BannerText, Text::new(""), font(56.0), TextColor(Color::WHITE), TextLayout::new(Justify::Center, LineBreak::WordBoundary)));
-            c.spawn((BannerSub, Text::new(""), font(22.0), TextColor(Color::srgb(0.85, 0.9, 1.0)), TextLayout::new(Justify::Center, LineBreak::WordBoundary)));
+            c.spawn((BannerText, Text::new(""), font(56.0), TextColor(Color::WHITE), TextLayout::justify(Justify::Center)));
+            c.spawn((BannerSub, Text::new(""), font(22.0), TextColor(Color::srgb(0.85, 0.9, 1.0)), TextLayout::justify(Justify::Center)));
         });
 
     // Controls hint, bottom right.

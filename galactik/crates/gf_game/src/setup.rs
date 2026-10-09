@@ -1,7 +1,7 @@
 //! Camera, lights and shared assets that live for the whole app.
 
 use bevy::camera::Hdr;
-use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::render::view::Tonemapping;
 use bevy::light::AmbientLight;
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
