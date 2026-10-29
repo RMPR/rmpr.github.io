@@ -21,7 +21,7 @@ const BANNED = {
   "840": "United States", "580": "United States", "850": "United States", "316": "United States", "016": "United States", "630": "United States",
   "392": "Japan", "120": "Cameroon", "356": "India", "398": "Kazakhstan", "380": "Italy",
   "578": "Norway", "744": "Norway", "074": "Norway",
-  "040": "Austria", "688": "Serbia", "586": "Pakistan",
+  "040": "Austria", "688": "Serbia",
   "372": "Ireland", "638": "France", "254": "France", "474": "France", "312": "France", "175": "France", "876": "France",
   "581": "United States", "156": "China", "344": "China", "446": "China", "410": "South Korea",
   "276": "Germany", "076": "Brazil",
@@ -114,10 +114,16 @@ function nearestCountry(lon, lat) {
 
 const places = [];
 const rejects = [];
-function add(name, a2, lat, lon, tier, kind) {
+function add(name, a2, lat, lon, tier, kind, isCapital = false) {
   const num = a2num[a2];
   if (!num || BANNED[num]) return false;
-  if (places.some((p) => d3.geoDistance([p[2], p[1]], [lon, lat]) * 6371 < 15)) return false; // duplicate
+  const near = places.findIndex((p) => d3.geoDistance([p[2], p[1]], [lon, lat]) * 6371 < 15);
+  if (near >= 0) {
+    // A capital replaces a bigger city right next to it (Islamabad vs Rawalpindi);
+    // anything else this close is a duplicate.
+    if (isCapital && places[near][5] === "c" && places[near][4] === num) places.splice(near, 1);
+    else return false;
+  }
   let hit = countryAt(lon, lat);
   if (hit === null) hit = nearestCountry(lon, lat);
   if (hit !== num) { rejects.push([name, a2, num, hit]); return false; }
@@ -148,7 +154,7 @@ for (const c of cities) {
   else tier = 3;
   perCountry[c.a2] = perCountry[c.a2] || 0;
   if (c.fcode !== "PPLC" && perCountry[c.a2] >= 10) continue;
-  if (add(c.name, c.a2, c.lat, c.lon, tier, "c")) { kept.push(c); perCountry[c.a2]++; }
+  if (add(c.name, c.a2, c.lat, c.lon, tier, "c", c.fcode === "PPLC")) { kept.push(c); perCountry[c.a2]++; }
 }
 
 const byTier = [1, 2, 3].map((t) => places.filter((p) => p[3] === t).length);
