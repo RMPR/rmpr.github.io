@@ -1,6 +1,7 @@
-// ZapTap API: hands out today's puzzle one round at a time, scores guesses
-// server-side and keeps a daily leaderboard. Runs on Cloudflare Workers + D1
-// (both free tier).
+// ZapTap server: serves the game, hands out today's puzzle one round at a
+// time, scores guesses and keeps a daily leaderboard. Runs on Cloudflare
+// Workers + D1 behind Cloudflare Access (all free tier), so players sign in
+// with their Zivid Microsoft account.
 //
 // The daily puzzle is picked with an HMAC of the date under SEED_SECRET, so
 // future puzzles can't be computed from the public code. Days roll over at
@@ -116,18 +117,112 @@ async function sha256Hex(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// The browser keeps a random token; we only ever store its hash.
-async function playerFor(env, token) {
-  if (typeof token !== "string" || !/^[0-9a-f-]{36}$/i.test(token)) throw new HttpError(400, "bad_token");
-  const id = await sha256Hex(token.toLowerCase());
-  const row = await env.DB.prepare("SELECT name FROM players WHERE id = ?").bind(id).first();
-  return { id, name: row ? row.name : null };
+// Cloudflare Access signs in the player and passes us a signed JWT, either as
+// the Cf-Access-Jwt-Assertion header or the CF_Authorization cookie. We check
+// it ourselves rather than trusting that every request went through Access.
+
+const b64url = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
+const b64json = (s) => JSON.parse(new TextDecoder().decode(b64url(s)));
+const teamUrl = (env) => (env.ACCESS_TEAM_DOMAIN.includes("://") ? env.ACCESS_TEAM_DOMAIN : "https://" + env.ACCESS_TEAM_DOMAIN);
+
+let accessKeys = null;
+let accessKeysAt = 0;
+async function accessKey(env, kid) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!accessKeys || Date.now() - accessKeysAt > 3600e3 || attempt === 1) {
+      const res = await fetch(teamUrl(env) + "/cdn-cgi/access/certs");
+      if (!res.ok) throw new Error("couldn't fetch Access certs: " + res.status);
+      const { keys } = await res.json();
+      accessKeys = await Promise.all(
+        keys.map(async (k) => ({ kid: k.kid, key: await crypto.subtle.importKey("jwk", k, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]) }))
+      );
+      accessKeysAt = Date.now();
+    }
+    const found = accessKeys.find((k) => k.kid === kid);
+    if (found) return found.key; // otherwise the keys may have rotated: refetch once
+  }
+  return null;
+}
+
+function cookie(request, name) {
+  const m = (request.headers.get("Cookie") || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)"));
+  return m ? m[1] : null;
+}
+
+async function identify(request, env) {
+  // Local development only: `wrangler dev` has no Access in front of it.
+  if (env.DEV_AUTH === "header") {
+    const email = (request.headers.get("X-Dev-Email") || "").toLowerCase();
+    if (!email) throw new HttpError(401, "not_signed_in");
+    return { email, jwt: null };
+  }
+  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD || env.ACCESS_AUD.startsWith("REPLACE")) throw new Error("Cloudflare Access is not configured");
+  const jwt = request.headers.get("Cf-Access-Jwt-Assertion") || cookie(request, "CF_Authorization");
+  if (!jwt) throw new HttpError(401, "not_signed_in");
+  const [h, p, sig] = jwt.split(".");
+  let header;
+  let payload;
+  try {
+    header = b64json(h);
+    payload = b64json(p);
+  } catch (e) {
+    throw new HttpError(401, "bad_session");
+  }
+  const key = header.alg === "RS256" ? await accessKey(env, header.kid) : null;
+  const valid = key && (await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64url(sig), new TextEncoder().encode(h + "." + p)));
+  const aud = [].concat(payload.aud || []);
+  if (!valid || !aud.includes(env.ACCESS_AUD) || payload.iss !== teamUrl(env) || !(payload.exp * 1000 > Date.now())) {
+    throw new HttpError(401, "bad_session");
+  }
+  const email = String(payload.email || "").toLowerCase();
+  const domain = (env.ALLOWED_EMAIL_DOMAIN || "").toLowerCase();
+  if (!email || (domain && !email.endsWith("@" + domain))) throw new HttpError(403, "not_allowed");
+  return { email, jwt };
 }
 
 function cleanName(name) {
   if (typeof name !== "string") return null;
-  const n = name.normalize("NFC").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
-  return n.length >= 1 && n.length <= 24 ? n : null;
+  const n = name.normalize("NFC").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, 24).trim();
+  return n.length >= 1 ? n : null;
+}
+
+// The name from the Microsoft account if Access knows it, else from the
+// email address: paul.mairo@zivid.com -> Paul Mairo.
+async function defaultName(env, who) {
+  if (who.jwt) {
+    try {
+      const res = await fetch(teamUrl(env) + "/cdn-cgi/access/get-identity", { headers: { Cookie: "CF_Authorization=" + who.jwt } });
+      const name = res.ok ? cleanName((await res.json()).name) : null;
+      if (name) return name;
+    } catch (e) {
+      // Fall back to the email address.
+    }
+  }
+  const local = who.email.split("@")[0];
+  return cleanName(local.split(/[._-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")) || "Zividian";
+}
+
+// Players are keyed by a hash of their email; the first visit creates them
+// with a unique display name they can change later.
+async function playerFor(request, env) {
+  const who = await identify(request, env);
+  const id = await sha256Hex(who.email);
+  const row = await env.DB.prepare("SELECT name FROM players WHERE id = ?").bind(id).first();
+  if (row) return { id, name: row.name };
+  const base = await defaultName(env, who);
+  for (let n = 1; n < 100; n++) {
+    const name = n === 1 ? base : `${base.slice(0, 21)} ${n}`;
+    try {
+      await env.DB.prepare("INSERT INTO players (id, name, name_key, created_at) VALUES (?, ?, ?, ?)")
+        .bind(id, name, name.toLowerCase(), Date.now())
+        .run();
+      return { id, name };
+    } catch (e) {
+      const again = await env.DB.prepare("SELECT name FROM players WHERE id = ?").bind(id).first();
+      if (again) return { id, name: again.name }; // created by a parallel request
+    }
+  }
+  throw new Error("couldn't find a free name for " + base);
 }
 
 // ---------------------------------------------------------------- game
@@ -157,7 +252,7 @@ async function guessesFor(env, day, playerId) {
 async function state(env, player) {
   const day = today();
   const targets = await puzzleFor(env, day);
-  const guesses = player.name ? await guessesFor(env, day, player.id) : [];
+  const guesses = await guessesFor(env, day, player.id);
   const rounds = guesses.map((g) => roundView(targets[g.round], g.round, g));
   if (rounds.length < 5) rounds.push(roundView(targets[rounds.length], rounds.length));
   return {
@@ -172,7 +267,6 @@ async function state(env, player) {
 }
 
 async function guess(env, player, body) {
-  if (!player.name) throw new HttpError(409, "need_name");
   const day = today();
   if (body.day !== day) throw new HttpError(409, "day_over");
   const lon = Number(body.lon);
@@ -229,11 +323,7 @@ async function setName(env, player, body) {
   const key = name.toLowerCase();
   const taken = await env.DB.prepare("SELECT id FROM players WHERE name_key = ?").bind(key).first();
   if (taken && taken.id !== player.id) throw new HttpError(409, "name_taken");
-  await env.DB.prepare(
-    "INSERT INTO players (id, name, name_key, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, name_key = excluded.name_key"
-  )
-    .bind(player.id, name, key, Date.now())
-    .run();
+  await env.DB.prepare("UPDATE players SET name = ?, name_key = ? WHERE id = ?").bind(name, key, player.id).run();
   return { name };
 }
 
@@ -268,41 +358,35 @@ class HttpError extends Error {
   }
 }
 
-function cors(request, env) {
-  const origin = request.headers.get("Origin") || "";
-  const allowed = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim());
-  return allowed.includes(origin) || allowed.includes("*")
-    ? { "Access-Control-Allow-Origin": origin || "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", Vary: "Origin" }
-    : {};
-}
-
-const json = (data, status, headers) =>
-  new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers } });
+const json = (data, status) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
 export default {
+  // Static files (the game itself) are served by Workers Assets before this
+  // runs; everything else lands here.
   async fetch(request, env) {
-    const headers = cors(request, env);
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/config.js") {
+        return new Response("window.ZAPTAP_SERVER = true;\n", { headers: { "Content-Type": "text/javascript", "Cache-Control": "no-store" } });
+      }
+      if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+      const player = await playerFor(request, env);
       if (request.method === "GET" && url.pathname === "/api/leaderboard") {
         const day = url.searchParams.get("day") || today();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today()) throw new HttpError(400, "bad_day");
-        return json(await leaderboard(env, day), 200, headers);
+        return json(await leaderboard(env, day), 200);
       }
-      if (request.method === "POST" && url.pathname.startsWith("/api/")) {
+      if (request.method === "POST") {
         const body = await request.json().catch(() => ({}));
-        const player = await playerFor(env, body.token);
-        if (url.pathname === "/api/state") return json(await state(env, player), 200, headers);
-        if (url.pathname === "/api/guess") return json(await guess(env, player, body), 200, headers);
-        if (url.pathname === "/api/name") return json(await setName(env, player, body), 200, headers);
+        if (url.pathname === "/api/state") return json(await state(env, player), 200);
+        if (url.pathname === "/api/guess") return json(await guess(env, player, body), 200);
+        if (url.pathname === "/api/name") return json(await setName(env, player, body), 200);
       }
-      if (url.pathname === "/") return json({ ok: true, day: today() }, 200, headers);
       throw new HttpError(404, "not_found");
     } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.message }, e.status, headers);
+      if (e instanceof HttpError) return json({ error: e.message }, e.status);
       console.error(e);
-      return json({ error: "server_error" }, 500, headers);
+      return json({ error: "server_error" }, 500);
     }
   },
 };

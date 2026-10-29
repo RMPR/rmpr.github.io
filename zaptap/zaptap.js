@@ -7,7 +7,9 @@
   const TIERS = [1, 1, 2, 3, 3]; // place difficulty per round
   const EPOCH = "2026-10-29"; // ZapTap #1
   const STORE_KEY = "zaptap:v1";
-  const API = (window.ZAPTAP_API || "").replace(/\/$/, ""); // empty: offline mode, no leaderboard
+  // Served by the ZapTap Worker (behind Zivid sign-in): server-run daily and
+  // leaderboard. Anywhere else: offline daily, no leaderboard.
+  const ONLINE = !!window.ZAPTAP_SERVER;
   const TOPO_HI = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json";
   const TOPO_LO = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json";
   const MIN_ZOOM = 0.8;
@@ -25,7 +27,7 @@
     }
   }
   const store = Object.assign(
-    { days: {}, practice: { played: 0, best: 0, sum: 0 }, achievements: {}, shares: 0, name: null, token: null },
+    { days: {}, practice: { played: 0, best: 0, sum: 0 }, achievements: {}, shares: 0, name: null },
     loadStore()
   );
   function save() {
@@ -524,27 +526,22 @@
 
   // ---------------------------------------------------------------- server
 
-  function uuid() {
-    if (crypto.randomUUID) return crypto.randomUUID();
-    const b = crypto.getRandomValues(new Uint8Array(16));
-    b[6] = (b[6] & 0x0f) | 0x40;
-    b[8] = (b[8] & 0x3f) | 0x80;
-    const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
-    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-  }
-
-  // The token is this player's only credential: the server stores its hash.
-  function token() {
-    if (!store.token) {
-      store.token = uuid();
-      save();
-    }
-    return store.token;
-  }
-
+  // Same origin as the page, so the Cloudflare Access cookie identifies the player.
   async function api(path, body) {
-    const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: token(), ...body }) };
-    const res = await fetch(API + path, opts);
+    const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+    const res = await fetch(path, opts);
+    if (res.status === 401 || (res.redirected && !res.url.includes("/api/"))) {
+      // The sign-in expired: reloading lets Access log the player in again.
+      // The flag stops a reload loop if something else is wrong.
+      if (!sessionStorage.getItem("zaptap:relogin")) {
+        sessionStorage.setItem("zaptap:relogin", "1");
+        location.reload();
+      }
+      const err = new Error("not_signed_in");
+      err.code = "not_signed_in";
+      throw err;
+    }
+    sessionStorage.removeItem("zaptap:relogin");
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.error || "http_" + res.status);
@@ -562,7 +559,7 @@
 
   function dailyRecord(key) {
     if (!store.days[key]) {
-      store.days[key] = { targets: API ? [] : pickTargets(mulberry32(hashStr("zaptap:" + key))), rounds: [] };
+      store.days[key] = { targets: ONLINE ? [] : pickTargets(mulberry32(hashStr("zaptap:" + key))), rounds: [] };
       save();
     }
     return store.days[key];
@@ -571,7 +568,7 @@
   async function startDaily() {
     if (busy) return;
     closeSheets();
-    if (!API) {
+    if (!ONLINE) {
       const key = dayKey();
       const rec = dailyRecord(key);
       game = { mode: "daily", key, targets: rec.targets, rounds: rec.rounds, rec, phase: "guess" };
@@ -589,7 +586,6 @@
     } finally {
       busy = false;
     }
-    if (!st.name) return askName(startDaily);
     store.name = st.name;
 
     // Mirror the server's view locally, keeping what only this browser knows.
@@ -657,7 +653,7 @@
     const t = game.targets[i];
     const g = [round4(pending[0]), round4(pending[1])];
 
-    if (game.mode === "daily" && API) {
+    if (game.mode === "daily" && ONLINE) {
       game.phase = "checking";
       setAction("Checking…", false);
       let res;
@@ -669,7 +665,6 @@
           toast(e.code === "day_over" ? "A new ZapTap has started!" : "Syncing with the server…");
           return startDaily();
         }
-        if (e.code === "need_name") return askName(startDaily);
         toast("Couldn't reach the server. Try again.");
         setAction("Confirm guess", true);
         return;
@@ -800,10 +795,10 @@
     if (rec && rec.rounds.length >= 5 && rec.total !== undefined) play.textContent = `See today's result (${rec.total})`;
     else if (rec && rec.rounds.length > 0) play.textContent = `Resume today (round ${rec.rounds.length + 1} / 5)`;
     else play.textContent = "Play today";
-    $("home-board").hidden = !API;
+    $("home-board").hidden = !ONLINE;
     const st = computeStats();
     const bits = [];
-    if (API && store.name) bits.push(`Playing as ${store.name}`);
+    if (ONLINE && store.name) bits.push(`Playing as ${store.name}`);
     if (st.played) bits.push(`🔥 ${st.streak}-day streak`, `best ${st.best}`);
     $("home-streak").textContent = bits.join(" · ");
     openSheet("home");
@@ -833,11 +828,11 @@
         return li;
       })
     );
-    $("results-board").hidden = !(daily && API);
+    $("results-board").hidden = !(daily && ONLINE);
     $("results-rank").hidden = true;
     openSheet("results");
     tickCountdown();
-    if (daily && API) refreshRank();
+    if (daily && ONLINE) refreshRank();
   }
 
   async function refreshRank() {
@@ -948,7 +943,6 @@
     $("board-note").textContent = "";
     $("board-me").textContent = store.name ? `You're playing as ${store.name}.` : "Play today's ZapTap to get on the board.";
     $("board-rename").hidden = !store.name;
-    $("board-device").hidden = !store.name;
     if (!$("board").open) openSheet("board");
     let board;
     try {
@@ -991,28 +985,6 @@
     showBoard(b.dataset.day === "today" ? dayKey() : previousKey(dayKey()));
   });
   $("board-rename").addEventListener("click", () => askName(() => showBoard(boardDay || dayKey())));
-  $("board-device").addEventListener("click", async () => {
-    const link = `${location.origin}${location.pathname}#player=${token()}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      toast("Link copied. Open it on your other device, and keep it to yourself!");
-    } catch (e) {
-      prompt("Open this link on your other device (keep it private):", link);
-    }
-  });
-
-  // A #player=<token> link moves this player to a new device.
-  function adoptPlayerLink() {
-    const m = location.hash.match(/^#player=([0-9a-f-]{36})$/i);
-    if (!m) return;
-    history.replaceState(null, "", location.pathname + location.search);
-    if (m[1] === store.token) return;
-    if (store.token && !confirm("Switch this device to the player from the link? Today's progress here will follow that player.")) return;
-    store.token = m[1].toLowerCase();
-    store.name = null;
-    save();
-    toast("Player linked. Welcome back!");
-  }
 
   // ---------------------------------------------------------------- achievements
 
@@ -1148,7 +1120,7 @@
   async function checkYesterdayBoard() {
     const y = previousKey(dayKey());
     const rec = store.days[y];
-    if (!API || !store.name || !rec || rec.rounds.length < 5) return;
+    if (!ONLINE || !store.name || !rec || rec.rounds.length < 5) return;
     try {
       checkAchievements({ board: await api(`/api/leaderboard?day=${y}`) });
     } catch (e) {
@@ -1165,7 +1137,7 @@
   $("home-btn").addEventListener("click", showHome);
   $("help-btn").addEventListener("click", () => openSheet("help"));
   $("stats-btn").addEventListener("click", showStats);
-  $("board-btn").addEventListener("click", () => (API ? showBoard() : toast("The leaderboard isn't set up yet.")));
+  $("board-btn").addEventListener("click", () => (ONLINE ? showBoard() : toast("The leaderboard isn't set up yet.")));
   $("ach-btn").addEventListener("click", showAchievements);
 
   // ---------------------------------------------------------------- stats
@@ -1287,7 +1259,11 @@
 
   // ---------------------------------------------------------------- boot
 
-  adoptPlayerLink();
+  // On GitHub Pages, send players to the real game once it's deployed.
+  if (!ONLINE && window.ZAPTAP_HOME) {
+    location.replace(window.ZAPTAP_HOME);
+    return;
+  }
   readColors();
   renderFlags();
   checkAchievements({}, true); // backfill from history without fanfare
