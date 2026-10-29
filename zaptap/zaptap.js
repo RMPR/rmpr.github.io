@@ -335,6 +335,8 @@
     ctx.closePath();
   }
 
+  const EQUATOR = { type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]] };
+
   // Outline the answer's country once it's revealed. Contested places have no
   // country to show, just the pin.
   function drawCountry(t) {
@@ -377,6 +379,15 @@
     } else {
       drawVectorGlobe();
     }
+
+    // The equator, as a thin dashed line.
+    ctx.beginPath();
+    geoPath(EQUATOR);
+    ctx.setLineDash([8, 6]);
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(255, 210, 63, 0.75)";
+    ctx.stroke();
+    ctx.setLineDash([]);
 
     // Overlays
     if (game) {
