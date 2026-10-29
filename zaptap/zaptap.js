@@ -108,7 +108,7 @@
       usedCountries.add(pick[4]);
       const cont = DATA.countries[pick[4]][1];
       perContinent[cont] = (perContinent[cont] || 0) + 1;
-      return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: DATA.countries[pick[4]][0] };
+      return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: pick[6] || DATA.countries[pick[4]][0] };
     });
   }
 
