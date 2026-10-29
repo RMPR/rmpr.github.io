@@ -7,7 +7,7 @@
   const TIERS = [1, 1, 2, 3, 3]; // place difficulty per round
   const EPOCH = "2026-10-29"; // ZapTap #1
   const STORE_KEY = "zaptap:v1";
-  // Served by the ZapTap Worker (behind Zivid sign-in): server-run daily and
+  // Served by Azure Static Web Apps (behind Zivid sign-in): server-run daily and
   // leaderboard. Anywhere else: offline daily, no leaderboard.
   const ONLINE = !!window.ZAPTAP_SERVER;
   const TOPO_HI = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json";
@@ -526,23 +526,21 @@
 
   // ---------------------------------------------------------------- server
 
-  // Same origin as the page, so the Cloudflare Access cookie identifies the player.
+  // Same origin as the page, so the Microsoft sign-in cookie identifies the player.
   async function api(path, body) {
     const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
     const res = await fetch(path, opts);
-    if (res.status === 401 || (res.redirected && !res.url.includes("/api/"))) {
-      // The sign-in expired: reloading lets Access log the player in again.
-      // The flag stops a reload loop if something else is wrong.
+    const data = await res.json().catch(() => ({}));
+    if (data.error === "not_signed_in") {
+      // The sign-in expired: reloading sends the player through Microsoft
+      // sign-in again. The flag stops a reload loop if something else is wrong.
       if (!sessionStorage.getItem("zaptap:relogin")) {
         sessionStorage.setItem("zaptap:relogin", "1");
         location.reload();
       }
-      const err = new Error("not_signed_in");
-      err.code = "not_signed_in";
-      throw err;
+    } else {
+      sessionStorage.removeItem("zaptap:relogin");
     }
-    sessionStorage.removeItem("zaptap:relogin");
-    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.error || "http_" + res.status);
       err.code = data.error;
@@ -581,7 +579,8 @@
     try {
       st = await api("/api/state", {});
     } catch (e) {
-      toast("Couldn't reach the ZapTap server. Try again in a bit.");
+      if (e.code === "not_allowed") toast("ZapTap is for Zivid accounts. Sign in with your @zivid.com account.", 4000);
+      else if (e.code !== "not_signed_in") toast("Couldn't reach the ZapTap server. Try again in a bit.");
       return;
     } finally {
       busy = false;

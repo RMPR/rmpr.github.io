@@ -1,5 +1,0 @@
-# Files the ZapTap Worker must not serve as static assets.
-worker
-tools
-# The Worker serves its own config.js.
-config.js
