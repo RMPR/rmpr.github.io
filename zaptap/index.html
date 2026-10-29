@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ZapTap</title>
+  <meta name="description" content="A daily geography game for Zividians: tap the globe, anywhere except where we're from.">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230b1020'/%3E%3Cpath d='M36 6 14 36h15l-4 22 24-32H34z' fill='%23ffd23f'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="zaptap.css">
+</head>
+<body>
+  <header class="bar">
+    <button class="brand" id="home-btn" aria-label="ZapTap home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg>
+      <span>ZapTap</span>
+    </button>
+    <div class="bar__actions">
+      <button class="icon-btn" id="board-btn" aria-label="Leaderboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>
+      </button>
+      <button class="icon-btn" id="ach-btn" aria-label="Achievements">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m9 14.2-1.5 7.3L12 19l4.5 2.5-1.5-7.3"/></svg>
+      </button>
+      <button class="icon-btn" id="stats-btn" aria-label="Statistics">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      </button>
+      <button class="icon-btn" id="help-btn" aria-label="How to play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4"/><circle cx="12" cy="17.4" r=".6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <canvas id="stars" aria-hidden="true"></canvas>
+    <canvas id="earth" aria-hidden="true"></canvas>
+    <canvas id="globe" aria-label="Globe. Drag to spin, pinch or scroll to zoom, tap to place your guess."></canvas>
+
+    <div class="prompt" id="prompt" hidden>
+      <div class="prompt__meta">
+        <span id="round-label">Round 1 / 5</span>
+        <span class="pill" id="round-weight">×1</span>
+        <span class="prompt__total" id="running-total">0</span>
+      </div>
+      <div class="prompt__place" id="place-name">—</div>
+      <div class="prompt__country" id="place-country"></div>
+    </div>
+
+    <div class="zoom">
+      <button class="icon-btn" id="zoom-in" aria-label="Zoom in">+</button>
+      <button class="icon-btn" id="zoom-out" aria-label="Zoom out">−</button>
+    </div>
+
+    <div class="dock" id="dock" hidden>
+      <div class="reveal" id="reveal" hidden>
+        <div class="reveal__score"><span id="reveal-score">0</span><small>/100</small></div>
+        <div class="reveal__text">
+          <div id="reveal-distance"></div>
+          <div class="muted" id="reveal-note"></div>
+        </div>
+      </div>
+      <button class="btn btn--primary" id="action-btn" disabled>Tap the globe</button>
+    </div>
+
+    <div class="loading" id="loading">Loading the world…</div>
+  </main>
+
+  <!-- Home -->
+  <dialog class="sheet" id="home">
+    <div class="sheet__body">
+      <div class="hero">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg>
+        <h1>ZapTap</h1>
+        <p class="muted" id="home-date"></p>
+      </div>
+      <p>Five places a day. Tap where you think they are. The closer you are, the more points you get.</p>
+      <p class="muted small">The twist: nothing is ever in a country a Zividian comes from.</p>
+      <div class="stack">
+        <button class="btn btn--primary" id="play-daily">Play today</button>
+        <button class="btn" id="home-board">Leaderboard</button>
+        <button class="btn" id="play-practice">Practice round</button>
+      </div>
+      <p class="muted small center" id="home-streak"></p>
+    </div>
+  </dialog>
+
+  <!-- Results -->
+  <dialog class="sheet" id="results">
+    <div class="sheet__body">
+      <h2 id="results-title">ZapTap</h2>
+      <div class="big-score"><span id="results-total">0</span><small>/1000</small></div>
+      <p class="rank-line" id="results-rank" hidden></p>
+      <ol class="rounds" id="results-rounds"></ol>
+      <div class="stack">
+        <button class="btn btn--primary" id="share-btn">Share result</button>
+        <button class="btn" id="results-board">Leaderboard</button>
+        <button class="btn" id="results-practice">Practice round</button>
+        <button class="btn btn--ghost" id="results-close">See the map</button>
+      </div>
+      <p class="muted small center" id="next-countdown"></p>
+    </div>
+  </dialog>
+
+  <!-- Stats -->
+  <dialog class="sheet" id="stats">
+    <div class="sheet__body">
+      <h2>Statistics</h2>
+      <div class="tiles" id="stat-tiles"></div>
+      <h3>Daily scores</h3>
+      <div class="dist" id="stat-dist"></div>
+      <h3>Recent days</h3>
+      <ul class="history" id="stat-history"></ul>
+      <p class="muted small">Everything lives in this browser's local storage. No account, nothing is sent anywhere.</p>
+      <div class="stack"><button class="btn" data-close>Close</button></div>
+    </div>
+  </dialog>
+
+  <!-- Leaderboard -->
+  <dialog class="sheet" id="board">
+    <div class="sheet__body">
+      <h2>Leaderboard</h2>
+      <div class="tabs" id="board-tabs">
+        <button data-day="today" class="on">Today</button>
+        <button data-day="yesterday">Yesterday</button>
+      </div>
+      <p class="muted small" id="board-title"></p>
+      <ol class="board" id="board-list"></ol>
+      <p class="muted small" id="board-note"></p>
+      <p class="small" id="board-me"></p>
+      <div class="stack">
+        <button class="btn" id="board-rename">Change my name</button>
+        <button class="btn btn--ghost" data-close>Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Achievements -->
+  <dialog class="sheet" id="achievements">
+    <div class="sheet__body">
+      <h2>Achievements</h2>
+      <p class="muted small" id="ach-count"></p>
+      <ul class="achievements" id="ach-list"></ul>
+      <div class="stack"><button class="btn" data-close>Close</button></div>
+    </div>
+  </dialog>
+
+  <!-- Name -->
+  <dialog class="sheet" id="name-dlg">
+    <form class="sheet__body" id="name-form">
+      <h2>Your name</h2>
+      <p class="muted small">This is the name the daily leaderboard shows. It starts as your Microsoft account name; use whatever people know you by in the channel.</p>
+      <input class="input" id="name-input" maxlength="24" autocomplete="nickname" placeholder="Your name" required>
+      <p class="error small" id="name-error"></p>
+      <div class="stack">
+        <button class="btn btn--primary" id="name-save" type="submit">Save</button>
+        <button class="btn btn--ghost" id="name-cancel" type="button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Help -->
+  <dialog class="sheet" id="help">
+    <div class="sheet__body">
+      <h2>How to play</h2>
+      <ul class="rules">
+        <li>Each day brings five places, the same for everyone. Find them on the globe.</li>
+        <li>Drag to spin, pinch or scroll to zoom, tap to drop your pin, then confirm.</li>
+        <li>You get 100 points for landing within 22&nbsp;km. Points drop with distance, down to 0 at 16,250&nbsp;km.</li>
+        <li>Later rounds are harder and count more: ×1 ×1 ×2 ×3 ×3, for 1000 points max.</li>
+        <li>Daily bonus: a pin in the right country scores at least 25, and the right continent scores at least 10.</li>
+        <li>A new ZapTap starts at midnight Oslo time, and so does the leaderboard.</li>
+        <li>Your daily score goes on the team leaderboard under your name. There are achievements to unlock too.</li>
+      </ul>
+      <h3>Off-limits countries</h3>
+      <p class="muted small">No place is ever in a country a Zividian comes from:</p>
+      <div class="flags flags--list" id="help-flags"></div>
+      <p class="muted small">Missing your country? Tell Paul. Imagery: <a href="https://earthobservatory.nasa.gov/features/BlueMarble" target="_blank" rel="noopener">NASA Blue Marble</a> via <a href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api" target="_blank" rel="noopener">GIBS</a>. Place data: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0), borders: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>. Inspired by <a href="https://maptap.gg" target="_blank" rel="noopener">maptap.gg</a>.</p>
+      <div class="stack"><button class="btn" data-close>Got it</button></div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+  <script src="config.js"></script>
+  <script src="places.js"></script>
+  <script src="earth.js"></script>
+  <script src="zaptap.js"></script>
+</body>
+</html>

@@ -84,3 +84,6 @@ exclude:
   - LICENSE
   - README.md
   - CNAME
+  - zaptap/tools
+  - zaptap/api
+  - zaptap/staticwebapp.config.json

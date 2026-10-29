@@ -1,0 +1,71 @@
+# ZapTap on Azure
+
+ZapTap runs on Azure Static Web Apps (Free plan): it serves the game from
+`zaptap/`, runs this folder as its API (Azure Functions), and signs people in
+with their Microsoft account. Leaderboard data lives in Azure Table Storage,
+which costs a few cents a month at this size.
+
+What the API does:
+
+- Picks each day's five places with an HMAC of the date under `SEED_SECRET`,
+  so future puzzles can't be worked out from the public code.
+- Hands out one place at a time and returns its answer only after you guess.
+- Scores guesses itself (distance, round weights, country/continent bonus), so
+  leaderboard scores can't be typed in by hand.
+- One game per person per day. Days and the leaderboard roll over at midnight
+  Oslo time.
+
+Sign-in: every page needs a signed-in Microsoft account
+(`staticwebapp.config.json`), and the API only accepts emails ending in
+`ALLOWED_EMAIL_DOMAIN` (`zivid.com`). The Free plan's built-in Microsoft login
+lets any Microsoft account reach the pages themselves, which are just the
+public game; locking those to the Zivid tenant too needs the Standard plan and
+a custom Entra ID provider.
+
+Players are keyed by a SHA-256 of their email. Their display name starts as
+the Microsoft account name and can be changed in the game; names are unique.
+
+## Deploy
+
+From the repository root, in Azure Cloud Shell or anywhere with the az CLI
+and Node:
+
+```sh
+bash zaptap/api/deploy.sh
+```
+
+It creates (or updates) the resource group `zaptap-rg`, a storage account and
+the static web app `zaptap` in West Europe, sets the app settings, and deploys.
+Override the names with `ZAPTAP_RG`, `ZAPTAP_APP`, `ZAPTAP_LOCATION`.
+
+It prints the URL, e.g. `https://<name>.azurestaticapps.net`. To send
+rmpr.xyz/zaptap there, put it in `../config.js`:
+
+```js
+window.ZAPTAP_HOME = "https://<name>.azurestaticapps.net";
+```
+
+App settings (set by the script):
+
+| Setting | |
+| --- | --- |
+| `SEED_SECRET` | Picks the daily puzzles. Generated once; never change it, or today's puzzle changes under people's feet. |
+| `ZAPTAP_STORAGE` | Storage account connection string. |
+| `ALLOWED_EMAIL_DOMAIN` | Who may play. |
+
+## Updating places
+
+`src/places.json` is generated together with `../places.js` by
+`../tools/build.js`. Deploy again after regenerating it.
+
+## API
+
+All endpoints need a signed-in Zivid account.
+
+| Method | Path | Body | Returns |
+| --- | --- | --- | --- |
+| POST | `/api/state` | `{}` | today's played rounds (with answers) and the next place |
+| POST | `/api/guess` | `{day, round, lon, lat}` | the scored round, its answer, and the next place |
+| POST | `/api/name` | `{name}` | the new display name, or `409 name_taken` |
+| GET | `/api/leaderboard?day=YYYY-MM-DD` | | finished games for that day, best first |
+| GET | `/config.js` | | rewritten to `/api/config`: tells the page it's online |
