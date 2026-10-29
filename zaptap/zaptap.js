@@ -126,6 +126,7 @@
   let topoHi = null;
   let topoLo = null;
   let countryShapes = []; // { id, feature, bounds }
+  const shapesById = new Map(); // id -> features (some countries have several)
 
   // Vector land, only drawn while the satellite texture loads or without WebGL2.
   const drawable = (topo) => ({ land: topojson.feature(topo, topo.objects.land) });
@@ -138,6 +139,10 @@
       feature: f,
       bounds: d3.geoBounds(f),
     }));
+    for (const c of countryShapes) {
+      if (!shapesById.has(c.id)) shapesById.set(c.id, []);
+      shapesById.get(c.id).push(c.feature);
+    }
   }
 
   function inBounds([[w, s], [e, n]], [lon, lat]) {
@@ -330,6 +335,23 @@
     ctx.closePath();
   }
 
+  // Outline the answer's country once it's revealed. Contested places have no
+  // country to show, just the pin.
+  function drawCountry(t) {
+    const shapes = !t.contested && shapesById.get(t.id);
+    if (!shapes) return;
+    ctx.beginPath();
+    for (const f of shapes) geoPath(f);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = colors.answer;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = colors.answer;
+    ctx.stroke();
+  }
+
   function drawArc(a, b, color) {
     ctx.beginPath();
     geoPath({ type: "LineString", coordinates: [a, b] });
@@ -363,6 +385,7 @@
         const i = game.rounds.length - 1;
         shown.push([game.rounds[i], game.targets[i]]);
       }
+      for (const [, t] of shown) drawCountry(t);
       for (const [r, t] of shown) drawArc(r.g, [t.lon, t.lat], "#fff");
       for (const [r] of shown) drawPin(r.g, colors.guess);
       for (const [, t] of shown) drawPin([t.lon, t.lat], colors.answer, t.name);
@@ -609,6 +632,7 @@
     id: r.countryId,
     lon: r.answer ? r.answer[0] : undefined,
     lat: r.answer ? r.answer[1] : undefined,
+    contested: !!r.contested,
   });
   const roundFrom = (r) => ({ g: r.guess, km: r.km, s: r.score, h: r.inCountry ? 1 : 0, b: r.bonus || undefined });
 
