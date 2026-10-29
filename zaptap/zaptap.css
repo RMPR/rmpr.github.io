@@ -5,12 +5,6 @@
   --text: #121a2f;
   --muted: #5d6885;
   --line: #d9deea;
-  --ocean: #cfdcf2;
-  --ocean-edge: #9fb3d6;
-  --land: #fdfdfb;
-  --land-edge: #b8c3d9;
-  --banned: #8c97b3;
-  --grid: rgba(40, 60, 110, 0.10);
   --accent: #ffc400;
   --accent-ink: #1b1400;
   --guess: #ff4d6d;
@@ -28,12 +22,6 @@
     --text: #eef1f8;
     --muted: #97a2bf;
     --line: #26304c;
-    --ocean: #0d1630;
-    --ocean-edge: #2a3a66;
-    --land: #34477a;
-    --land-edge: #4a5e96;
-    --banned: #6b7aa6;
-    --grid: rgba(150, 175, 240, 0.08);
     --accent: #ffd23f;
     --accent-ink: #1b1400;
     --guess: #ff5c7a;
@@ -117,13 +105,18 @@ a { color: inherit; }
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 55%, #0a1230 0%, #03050d 65%, #010204 100%);
 }
 
-#globe {
+.stage canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+#globe {
   touch-action: none;
   cursor: crosshair;
 }
@@ -252,7 +245,7 @@ a { color: inherit; }
   inset: 0;
   display: grid;
   place-items: center;
-  color: var(--muted);
+  color: #97a2bf;
 }
 
 /* Sheets */
@@ -340,7 +333,7 @@ dialog.sheet::backdrop { background: rgba(7, 11, 22, 0.45); backdrop-filter: blu
   height: 18px;
   min-width: 22px;
   border-radius: 6px;
-  background: var(--land-edge);
+  background: var(--line);
   color: var(--text);
   font-size: 0.75rem;
   display: flex;

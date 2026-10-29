@@ -29,6 +29,8 @@
   </header>
 
   <main class="stage" id="stage">
+    <canvas id="stars" aria-hidden="true"></canvas>
+    <canvas id="earth" aria-hidden="true"></canvas>
     <canvas id="globe" aria-label="Globe. Drag to spin, pinch or scroll to zoom, tap to place your guess."></canvas>
 
     <div class="prompt" id="prompt" hidden>
@@ -69,8 +71,7 @@
         <p class="muted" id="home-date"></p>
       </div>
       <p>Five places a day. Tap where you think they are. The closer you are, the more points you get.</p>
-      <p class="muted small">The only rule: nothing is ever in a country a Zividian comes from.</p>
-      <div class="flags" id="home-flags"></div>
+      <p class="muted small">The twist: nothing is ever in a country a Zividian comes from.</p>
       <div class="stack">
         <button class="btn btn--primary" id="play-daily">Play today</button>
         <button class="btn" id="play-practice">Practice round</button>
@@ -121,9 +122,9 @@
         <li>A new ZapTap starts at your local midnight.</li>
       </ul>
       <h3>Off-limits countries</h3>
-      <p class="muted small">No place is ever in a country a Zividian comes from. They're hatched on the globe:</p>
+      <p class="muted small">No place is ever in a country a Zividian comes from:</p>
       <div class="flags flags--list" id="help-flags"></div>
-      <p class="muted small">Missing your country? Tell Paul. Place data: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0), borders: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>. Inspired by <a href="https://maptap.gg" target="_blank" rel="noopener">maptap.gg</a>.</p>
+      <p class="muted small">Missing your country? Tell Paul. Imagery: <a href="https://earthobservatory.nasa.gov/features/BlueMarble" target="_blank" rel="noopener">NASA Blue Marble</a> via <a href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api" target="_blank" rel="noopener">GIBS</a>. Place data: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0), borders: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>. Inspired by <a href="https://maptap.gg" target="_blank" rel="noopener">maptap.gg</a>.</p>
       <div class="stack"><button class="btn" data-close>Got it</button></div>
     </div>
   </dialog>
@@ -133,6 +134,7 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
   <script src="places.js"></script>
+  <script src="earth.js"></script>
   <script src="zaptap.js"></script>
 </body>
 </html>

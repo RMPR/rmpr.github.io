@@ -114,12 +114,9 @@
   let topoHi = null;
   let topoLo = null;
   let countryShapes = []; // { id, feature, bounds }
-  const bannedIds = new Set(DATA.bannedIds);
 
-  const drawable = (topo) => ({
-    land: topojson.feature(topo, topo.objects.land),
-    banned: topojson.merge(topo, topo.objects.countries.geometries.filter((g) => bannedIds.has(g.id))),
-  });
+  // Vector land, only drawn while the satellite texture loads or without WebGL2.
+  const drawable = (topo) => ({ land: topojson.feature(topo, topo.objects.land) });
 
   function prepareGeo(hi) {
     topoHi = drawable(hi);
@@ -146,8 +143,10 @@
 
   // ---------------------------------------------------------------- globe
 
-  const canvas = $("globe");
+  const canvas = $("globe"); // 2D overlay: pins, arcs, labels; also receives input
   const ctx = canvas.getContext("2d");
+  const starsCanvas = $("stars");
+  const earth = window.createEarth($("earth"), () => requestDraw());
   const projection = d3.geoOrthographic().clipAngle(90).precision(0.4);
   const geoPath = d3.geoPath(projection, ctx);
   const graticule = d3.geoGraticule10();
@@ -157,26 +156,33 @@
   let DPR = 1;
   let baseRadius = 200;
   let colors = {};
-  let hatch = null;
   let interacting = false;
   let idleTimer = 0;
   let frame = 0;
 
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
-    for (const k of ["ocean", "ocean-edge", "land", "land-edge", "banned", "grid", "guess", "answer", "text", "surface", "accent"]) {
+    for (const k of ["guess", "answer"]) {
       colors[k] = cs.getPropertyValue("--" + k).trim();
     }
-    const tile = document.createElement("canvas");
-    tile.width = tile.height = 7;
-    const t = tile.getContext("2d");
-    t.strokeStyle = colors.banned;
-    t.lineWidth = 1.1;
-    t.beginPath();
-    t.moveTo(-1, 8);
-    t.lineTo(8, -1);
-    t.stroke();
-    hatch = ctx.createPattern(tile, "repeat");
+  }
+
+  // A fixed, seeded starfield behind the globe.
+  function drawStars() {
+    starsCanvas.width = Math.round(W * DPR);
+    starsCanvas.height = Math.round(H * DPR);
+    const c = starsCanvas.getContext("2d");
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const rand = mulberry32(42);
+    const n = Math.round((W * H) / 1800);
+    for (let i = 0; i < n; i++) {
+      const big = rand() < 0.06;
+      c.globalAlpha = 0.25 + rand() * (big ? 0.75 : 0.45);
+      c.fillStyle = rand() < 0.15 ? "#cfe0ff" : "#ffffff";
+      c.beginPath();
+      c.arc(rand() * W, rand() * H, big ? 0.9 + rand() * 0.8 : 0.3 + rand() * 0.6, 0, 2 * Math.PI);
+      c.fill();
+    }
   }
 
   function centerY() {
@@ -190,8 +196,10 @@
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
-    baseRadius = Math.max(80, Math.min(W / 2 - 16, H / 2 - 70) * 0.96);
+    baseRadius = Math.max(80, Math.min(W / 2 - 6, H / 2 - 70));
+    drawStars();
     requestDraw();
+    scheduleDetail();
   }
 
   function requestDraw() {
@@ -204,7 +212,66 @@
     idleTimer = setTimeout(() => {
       interacting = false;
       requestDraw();
+      scheduleDetail();
     }, 180);
+  }
+
+  // Once the view settles, ask for sharper imagery of what's on screen.
+  let detailTimer = 0;
+  function scheduleDetail() {
+    if (!earth) return;
+    clearTimeout(detailTimer);
+    detailTimer = setTimeout(() => {
+      if (!interacting && W) earth.updateDetail(visibleBounds());
+    }, 120);
+  }
+
+  function visibleBounds() {
+    const R = baseRadius * view.zoom;
+    const cx = W / 2;
+    const cy = centerY();
+    let lonMin = Infinity;
+    let lonMax = -Infinity;
+    let latMin = Infinity;
+    let latMax = -Infinity;
+    const N = 14;
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        let x = (W * i) / N;
+        let y = (H * j) / N;
+        const d = Math.hypot(x - cx, y - cy);
+        if (d > R * 0.999) {
+          // Off the globe: use the nearest point on its edge instead.
+          x = cx + ((x - cx) * R * 0.999) / d;
+          y = cy + ((y - cy) * R * 0.999) / d;
+          if (x < 0 || x > W || y < 0 || y > H) continue;
+        }
+        const ll = projection.invert([x, y]);
+        if (!ll || Number.isNaN(ll[0])) continue;
+        const dl = ((ll[0] - view.lon + 540) % 360) - 180;
+        lonMin = Math.min(lonMin, dl);
+        lonMax = Math.max(lonMax, dl);
+        latMin = Math.min(latMin, ll[1]);
+        latMax = Math.max(latMax, ll[1]);
+      }
+    }
+    // Grid sampling misses the corners between samples: pad by a cell.
+    const padLon = (lonMax - lonMin) / N;
+    const padLat = (latMax - latMin) / N;
+    lonMin = view.lon + lonMin - padLon;
+    lonMax = view.lon + lonMax + padLon;
+    latMin = Math.max(-90, latMin - padLat);
+    latMax = Math.min(90, latMax + padLat);
+    for (const pole of [90, -90]) {
+      const p = projection([0, pole]);
+      if (isVisible([0, pole]) && p[0] >= 0 && p[0] <= W && p[1] >= 0 && p[1] <= H) {
+        lonMin = view.lon - 180;
+        lonMax = view.lon + 180;
+        if (pole > 0) latMax = 90;
+        else latMin = -90;
+      }
+    }
+    return { lonMin, lonMax, latMin, latMax, pxPerDeg: (R * DPR * Math.PI) / 180 };
   }
 
   const isVisible = (lonlat) => d3.geoDistance(lonlat, [view.lon, view.lat]) < Math.PI / 2 - 0.005;
@@ -233,12 +300,10 @@
       const w = ctx.measureText(label).width;
       const lx = Math.min(Math.max(x + 14, 8), W - w - 18);
       const ly = y - 30;
-      ctx.fillStyle = colors.surface;
-      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = "rgba(6, 10, 24, 0.82)";
       roundRect(lx - 6, ly - 13, w + 12, 20, 6);
       ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = colors.text;
+      ctx.fillStyle = "#fff";
       ctx.fillText(label, lx, ly + 2);
     }
   }
@@ -257,7 +322,7 @@
     ctx.beginPath();
     geoPath({ type: "LineString", coordinates: [a, b] });
     ctx.setLineDash([6, 5]);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.2;
     ctx.strokeStyle = color;
     ctx.stroke();
     ctx.setLineDash([]);
@@ -273,38 +338,11 @@
       .scale(baseRadius * view.zoom)
       .rotate([-view.lon, -view.lat]);
 
-    ctx.beginPath();
-    geoPath({ type: "Sphere" });
-    ctx.fillStyle = colors.ocean;
-    ctx.fill();
-
-    ctx.beginPath();
-    geoPath(graticule);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = colors.grid;
-    ctx.stroke();
-
-    const geo = interacting || !topoHi ? topoLo : topoHi;
-    if (geo) {
-      ctx.beginPath();
-      geoPath(geo.land);
-      ctx.fillStyle = colors.land;
-      ctx.fill();
-      ctx.lineWidth = 0.8;
-      ctx.strokeStyle = colors["land-edge"];
-      ctx.stroke();
-
-      ctx.beginPath();
-      geoPath(geo.banned);
-      ctx.fillStyle = hatch;
-      ctx.fill();
+    if (earth && earth.ready) {
+      earth.render({ width: W, height: H, dpr: DPR, cx: W / 2, cy: centerY(), radius: baseRadius * view.zoom, lon: view.lon, lat: view.lat });
+    } else {
+      drawVectorGlobe();
     }
-
-    ctx.beginPath();
-    geoPath({ type: "Sphere" });
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = colors["ocean-edge"];
-    ctx.stroke();
 
     // Overlays
     if (game) {
@@ -313,11 +351,38 @@
         const i = game.rounds.length - 1;
         shown.push([game.rounds[i], game.targets[i]]);
       }
-      for (const [r, t] of shown) drawArc(r.g, [t.lon, t.lat], colors.text);
+      for (const [r, t] of shown) drawArc(r.g, [t.lon, t.lat], "#fff");
       for (const [r] of shown) drawPin(r.g, colors.guess);
       for (const [, t] of shown) drawPin([t.lon, t.lat], colors.answer, t.name);
       if (game.phase === "guess" && pending) drawPin(pending, colors.guess);
     }
+  }
+
+  function drawVectorGlobe() {
+    ctx.beginPath();
+    geoPath({ type: "Sphere" });
+    ctx.fillStyle = "#0a2268";
+    ctx.fill();
+
+    ctx.beginPath();
+    geoPath(graticule);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(150, 180, 255, 0.08)";
+    ctx.stroke();
+
+    const geo = interacting || !topoHi ? topoLo : topoHi;
+    if (geo) {
+      ctx.beginPath();
+      geoPath(geo.land);
+      ctx.fillStyle = "#4f6b3a";
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    geoPath({ type: "Sphere" });
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(90, 140, 255, 0.6)";
+    ctx.stroke();
   }
 
   // Animate the view; lon takes the short way round.
@@ -782,8 +847,6 @@
   }
 
   function renderFlags() {
-    $("home-flags").textContent = DATA.banned.map(([, f]) => f).join("");
-    $("home-flags").title = DATA.banned.map(([n]) => n).join(", ");
     $("help-flags").innerHTML = "";
     for (const [name, flag] of DATA.banned) {
       const s = document.createElement("span");
@@ -796,6 +859,9 @@
 
   readColors();
   renderFlags();
+  if (earth) {
+    earth.loadBase("earth.jpg").catch(() => console.warn("ZapTap: couldn't load earth.jpg, using vector map"));
+  }
   window.addEventListener("resize", resize);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     readColors();
