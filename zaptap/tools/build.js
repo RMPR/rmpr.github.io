@@ -24,7 +24,7 @@ const BANNED = {
   "040": "Austria", "688": "Serbia", "586": "Pakistan",
   "372": "Ireland", "638": "France", "254": "France", "474": "France", "312": "France", "175": "France", "876": "France",
   "581": "United States", "156": "China", "344": "China", "446": "China", "410": "South Korea",
-  "276": "Germany",
+  "276": "Germany", "076": "Brazil",
 };
 
 function parseCsv(text) {
