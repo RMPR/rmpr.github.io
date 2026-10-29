@@ -7,6 +7,7 @@
   const TIERS = [1, 1, 2, 3, 3]; // place difficulty per round
   const EPOCH = "2026-10-29"; // ZapTap #1
   const STORE_KEY = "zaptap:v1";
+  const API = (window.ZAPTAP_API || "").replace(/\/$/, ""); // empty: offline mode, no leaderboard
   const TOPO_HI = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json";
   const TOPO_LO = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json";
   const MIN_ZOOM = 0.8;
@@ -23,7 +24,10 @@
       return {};
     }
   }
-  const store = Object.assign({ days: {}, practice: { played: 0, best: 0, sum: 0 } }, loadStore());
+  const store = Object.assign(
+    { days: {}, practice: { played: 0, best: 0, sum: 0 }, achievements: {}, shares: 0, name: null, token: null },
+    loadStore()
+  );
   function save() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -34,9 +38,16 @@
 
   // ---------------------------------------------------------------- dates
 
+  // Everyone plays the same day: it rolls over at midnight Oslo time.
   const pad = (n) => String(n).padStart(2, "0");
+  const osloDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const osloTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
   function dayKey(d = new Date()) {
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return osloDay.format(d);
+  }
+  function secondsToNextDay(d = new Date()) {
+    const [h, m, s] = osloTime.format(d).split(":").map(Number);
+    return 86400 - (h * 3600 + m * 60 + s);
   }
   function keyToDate(key) {
     const [y, m, d] = key.split("-").map(Number);
@@ -51,9 +62,8 @@
     return keyToDate(key).toLocaleDateString(undefined, opts);
   }
   function previousKey(key) {
-    const d = keyToDate(key);
-    d.setDate(d.getDate() - 1);
-    return dayKey(d);
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
   }
 
   // ---------------------------------------------------------------- puzzle
@@ -512,27 +522,100 @@
     requestDraw();
   }
 
+  // ---------------------------------------------------------------- server
+
+  function uuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
+
+  // The token is this player's only credential: the server stores its hash.
+  function token() {
+    if (!store.token) {
+      store.token = uuid();
+      save();
+    }
+    return store.token;
+  }
+
+  async function api(path, body) {
+    const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: token(), ...body }) };
+    const res = await fetch(API + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || "http_" + res.status);
+      err.code = data.error;
+      throw err;
+    }
+    return data;
+  }
+
   // ---------------------------------------------------------------- game
 
-  let game = null; // { mode, key, targets, rounds, phase }
+  let game = null; // { mode, key, targets, rounds, rec, phase }
   let pending = null;
+  let busy = false;
 
   function dailyRecord(key) {
     if (!store.days[key]) {
-      store.days[key] = { targets: pickTargets(mulberry32(hashStr("zaptap:" + key))), rounds: [] };
+      store.days[key] = { targets: API ? [] : pickTargets(mulberry32(hashStr("zaptap:" + key))), rounds: [] };
       save();
     }
     return store.days[key];
   }
 
-  function startDaily() {
-    const key = dayKey();
-    const rec = dailyRecord(key);
-    game = { mode: "daily", key, targets: rec.targets, rounds: rec.rounds, rec, phase: "guess" };
+  async function startDaily() {
+    if (busy) return;
     closeSheets();
-    if (rec.rounds.length >= 5) return showFinishedMap(true);
+    if (!API) {
+      const key = dayKey();
+      const rec = dailyRecord(key);
+      game = { mode: "daily", key, targets: rec.targets, rounds: rec.rounds, rec, phase: "guess" };
+      if (rec.rounds.length >= 5) return showFinishedMap(true);
+      return startRound();
+    }
+
+    busy = true;
+    let st;
+    try {
+      st = await api("/api/state", {});
+    } catch (e) {
+      toast("Couldn't reach the ZapTap server. Try again in a bit.");
+      return;
+    } finally {
+      busy = false;
+    }
+    if (!st.name) return askName(startDaily);
+    store.name = st.name;
+
+    // Mirror the server's view locally, keeping what only this browser knows.
+    const rec = dailyRecord(st.day);
+    const rounds = [];
+    for (const r of st.rounds) {
+      rec.targets[r.round] = targetFrom(r);
+      if (r.score !== undefined) rounds.push({ ...(rec.rounds[r.round] || {}), ...roundFrom(r) });
+    }
+    rec.rounds = rounds;
+    if (st.done) rec.total = st.total;
+    else delete rec.total; // e.g. a game played offline before the server existed
+    save();
+    game = { mode: "daily", key: st.day, targets: rec.targets, rounds: rec.rounds, rec, phase: "guess" };
+    if (st.done) return showFinishedMap(true);
     startRound();
   }
+
+  const targetFrom = (r) => ({
+    name: r.name,
+    country: r.country,
+    id: r.countryId,
+    lon: r.answer ? r.answer[0] : undefined,
+    lat: r.answer ? r.answer[1] : undefined,
+  });
+  const roundFrom = (r) => ({ g: r.guess, km: r.km, s: r.score, h: r.inCountry ? 1 : 0, b: r.bonus || undefined });
 
   function startPractice() {
     const targets = pickTargets(mulberry32((Math.random() * 2 ** 32) >>> 0));
@@ -569,36 +652,67 @@
     b.disabled = !enabled;
   }
 
-  function confirmGuess() {
+  async function confirmGuess() {
     const i = game.rounds.length;
     const t = game.targets[i];
-    const target = [t.lon, t.lat];
-    const km = d3.geoDistance(pending, target) * EARTH_KM;
+    const g = [round4(pending[0]), round4(pending[1])];
+
+    if (game.mode === "daily" && API) {
+      game.phase = "checking";
+      setAction("Checking…", false);
+      let res;
+      try {
+        res = await api("/api/guess", { day: game.key, round: i, lon: g[0], lat: g[1] });
+      } catch (e) {
+        game.phase = "guess";
+        if (["day_over", "wrong_round", "done"].includes(e.code)) {
+          toast(e.code === "day_over" ? "A new ZapTap has started!" : "Syncing with the server…");
+          return startDaily();
+        }
+        if (e.code === "need_name") return askName(startDaily);
+        toast("Couldn't reach the server. Try again.");
+        setAction("Confirm guess", true);
+        return;
+      }
+      Object.assign(t, targetFrom(res.result));
+      if (res.next) game.targets[i + 1] = targetFrom(res.next);
+      if (res.done) game.rec.total = res.total;
+      return applyRound(roundFrom(res.result), i);
+    }
+
+    const km = d3.geoDistance(g, [t.lon, t.lat]) * EARTH_KM;
     let s = distanceScore(km);
-    let bonus = "";
+    let b;
+    const hit = countryAt(g);
     if (game.mode === "daily") {
-      const hit = countryAt(pending);
       if (hit === t.id && s < 25) {
         s = 25;
-        bonus = "Right country: bumped up to 25.";
+        b = "country";
       } else if (hit && hit !== t.id && continentOf(hit) === continentOf(t.id) && s < 10) {
         s = 10;
-        bonus = "Right continent: bumped up to 10.";
+        b = "continent";
       }
     }
-    const round = { g: [round4(pending[0]), round4(pending[1])], km: Math.round(km), s };
+    applyRound({ g, km: Math.round(km * 10) / 10, s, h: hit === t.id ? 1 : 0, b }, i);
+  }
+
+  function applyRound(round, i) {
+    const t = game.targets[i];
+    round.c = countryAt(round.g) || undefined; // for achievements
     game.rounds.push(round);
     if (game.mode === "daily") save();
     game.phase = "reveal";
     pending = null;
 
+    const w = WEIGHTS[i];
     $("reveal").hidden = false;
-    $("reveal-score").textContent = s;
-    $("reveal-distance").textContent = `${formatKm(km)} away${WEIGHTS[i] > 1 ? ` · ×${WEIGHTS[i]} = ${s * WEIGHTS[i]}` : ""}`;
-    $("reveal-note").textContent = bonus || verdict(s);
+    $("reveal-score").textContent = round.s;
+    $("reveal-distance").textContent = `${formatKm(round.km)} away${w > 1 ? ` · ×${w} = ${round.s * w}` : ""}`;
+    $("reveal-note").textContent =
+      round.b === "country" ? "Right country: bumped up to 25." : round.b === "continent" ? "Right continent: bumped up to 10." : verdict(round.s);
     $("running-total").textContent = runningTotal();
     setAction(game.rounds.length < 5 ? "Next round" : "See results", true);
-    fitPoints(round.g, target);
+    fitPoints(round.g, [t.lon, t.lat]);
   }
 
   const round4 = (x) => Math.round(x * 1e4) / 1e4;
@@ -620,15 +734,16 @@
     const total = runningTotal();
     if (game.mode === "daily") {
       game.rec.total = total;
-      save();
+      game.rec.finishedAt = Date.now();
     } else {
       store.practice.played += 1;
       store.practice.sum += total;
       store.practice.best = Math.max(store.practice.best, total);
-      save();
     }
+    save();
     showFinishedMap(false);
     showResults();
+    checkAchievements({ game });
   }
 
   function showFinishedMap(openResults) {
@@ -673,7 +788,7 @@
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheets));
   document.querySelectorAll("dialog").forEach((d) =>
     d.addEventListener("click", (e) => {
-      if (e.target === d) d.close(); // backdrop
+      if (e.target === d && d.id !== "name-dlg") d.close(); // backdrop
     })
   );
 
@@ -682,18 +797,28 @@
     const rec = store.days[key];
     $("home-date").textContent = `#${dayNumber(key)} · ${prettyDate(key)}`;
     const play = $("play-daily");
-    if (rec && rec.rounds.length >= 5) play.textContent = `See today's result (${rec.total})`;
+    if (rec && rec.rounds.length >= 5 && rec.total !== undefined) play.textContent = `See today's result (${rec.total})`;
     else if (rec && rec.rounds.length > 0) play.textContent = `Resume today (round ${rec.rounds.length + 1} / 5)`;
     else play.textContent = "Play today";
+    $("home-board").hidden = !API;
     const st = computeStats();
-    $("home-streak").textContent = st.played ? `🔥 ${st.streak}-day streak · ${st.played} played · best ${st.best}` : "";
+    const bits = [];
+    if (API && store.name) bits.push(`Playing as ${store.name}`);
+    if (st.played) bits.push(`🔥 ${st.streak}-day streak`, `best ${st.best}`);
+    $("home-streak").textContent = bits.join(" · ");
     openSheet("home");
   }
 
+  // ---------------------------------------------------------------- results
+
+  let myRank = null; // { rank, of } on today's board, once known
+
   function showResults() {
     const total = runningTotal();
-    $("results-title").textContent =
-      game.mode === "daily" ? `ZapTap #${dayNumber(game.key)} · ${prettyDate(game.key, { day: "numeric", month: "short" })}` : "Practice round";
+    const daily = game.mode === "daily";
+    $("results-title").textContent = daily
+      ? `ZapTap #${dayNumber(game.key)} · ${prettyDate(game.key, { day: "numeric", month: "short" })}`
+      : "Practice round";
     $("results-total").textContent = total;
     const list = $("results-rounds");
     list.replaceChildren(
@@ -708,16 +833,39 @@
         return li;
       })
     );
-    $("results-practice").hidden = false;
+    $("results-board").hidden = !(daily && API);
+    $("results-rank").hidden = true;
     openSheet("results");
     tickCountdown();
+    if (daily && API) refreshRank();
+  }
+
+  async function refreshRank() {
+    try {
+      const board = await api(`/api/leaderboard?day=${game.key}`);
+      const i = board.entries.findIndex((e) => e.name === store.name);
+      if (i < 0) return;
+      myRank = { day: board.day, rank: i + 1, of: board.entries.length };
+      $("results-rank").textContent = `${medal(i + 1)} ${ordinal(i + 1)} of ${board.entries.length} today so far`;
+      $("results-rank").hidden = false;
+    } catch (e) {
+      // The rank is a nice-to-have.
+    }
+  }
+
+  const medal = (n) => ["🥇", "🥈", "🥉"][n - 1] || "🏅";
+  function ordinal(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
   }
 
   function shareText() {
-    const head =
-      game.mode === "daily" ? `ZapTap #${dayNumber(game.key)} ⚡ ${runningTotal()}/1000` : `ZapTap practice ⚡ ${runningTotal()}/1000`;
+    const daily = game.mode === "daily";
+    const head = daily ? `ZapTap #${dayNumber(game.key)} ⚡ ${runningTotal()}/1000` : `ZapTap practice ⚡ ${runningTotal()}/1000`;
     const line = game.rounds.map((r) => scoreEmoji(r.s) + r.s).join(" ");
-    return `${head}\n${line}\n${location.host}${location.pathname}`;
+    const rank = daily && myRank && myRank.day === game.key ? `\n${medal(myRank.rank)} ${ordinal(myRank.rank)} of ${myRank.of} so far` : "";
+    return `${head}\n${line}${rank}\n${location.host}${location.pathname}`;
   }
 
   $("share-btn").addEventListener("click", async () => {
@@ -730,32 +878,295 @@
         try {
           await navigator.share({ text });
         } catch (err) {
-          // User dismissed the share sheet.
+          return; // User dismissed the share sheet.
         }
       } else {
         toast("Couldn't copy, sorry");
+        return;
       }
     }
+    store.shares += 1;
+    save();
+    checkAchievements({});
   });
 
   let countdownTimer = 0;
   function tickCountdown() {
     clearTimeout(countdownTimer);
     if (!$("results").open) return;
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const s = Math.max(0, Math.floor((next - now) / 1000));
+    const s = secondsToNextDay();
     $("next-countdown").textContent = `Next ZapTap in ${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
     countdownTimer = setTimeout(tickCountdown, 1000);
   }
 
+  // ---------------------------------------------------------------- name
+
+  let afterName = null;
+  function askName(then) {
+    afterName = then;
+    $("name-input").value = store.name || "";
+    $("name-error").textContent = "";
+    openSheet("name-dlg");
+    setTimeout(() => $("name-input").focus(), 50);
+  }
+
+  $("name-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("name-input").value.trim();
+    if (!name) return;
+    const btn = $("name-save");
+    btn.disabled = true;
+    try {
+      const res = await api("/api/name", { name });
+      store.name = res.name;
+      save();
+      closeSheets();
+      const then = afterName;
+      afterName = null;
+      if (then) then();
+    } catch (err) {
+      $("name-error").textContent =
+        err.code === "name_taken" ? "Someone already uses that name. Try another one." : err.code === "bad_name" ? "Use 1 to 24 characters." : "Couldn't reach the server. Try again.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $("name-cancel").addEventListener("click", () => {
+    afterName = null;
+    closeSheets();
+  });
+
+  // ---------------------------------------------------------------- leaderboard
+
+  let boardDay = null;
+
+  async function showBoard(day = dayKey()) {
+    boardDay = day;
+    $("board-tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.day === (day === dayKey() ? "today" : "yesterday")));
+    $("board-title").textContent = `ZapTap #${dayNumber(day)} · ${prettyDate(day, { weekday: "short", day: "numeric", month: "short" })}`;
+    $("board-list").innerHTML = `<li class="muted">Loading…</li>`;
+    $("board-note").textContent = "";
+    $("board-me").textContent = store.name ? `You're playing as ${store.name}.` : "Play today's ZapTap to get on the board.";
+    $("board-rename").hidden = !store.name;
+    $("board-device").hidden = !store.name;
+    if (!$("board").open) openSheet("board");
+    let board;
+    try {
+      board = await api(`/api/leaderboard?day=${day}`);
+    } catch (e) {
+      $("board-list").innerHTML = `<li class="muted">Couldn't load the leaderboard.</li>`;
+      return;
+    }
+    if (boardDay !== day) return;
+    renderBoard(board);
+    checkAchievements({ board });
+  }
+
+  function renderBoard(board) {
+    const list = $("board-list");
+    if (!board.entries.length) {
+      list.innerHTML = `<li class="muted">No finished games yet. Be the first!</li>`;
+    } else {
+      list.replaceChildren(
+        ...board.entries.map((e, i) => {
+          const li = document.createElement("li");
+          if (e.name === store.name) li.className = "me";
+          li.innerHTML = `<span class="b-rank">${i < 3 ? medal(i + 1) : i + 1}</span><span class="b-name"></span><span class="b-emoji">${e.scores
+            .map(scoreEmoji)
+            .join("")}</span><span class="b-total">${e.total}</span>`;
+          li.querySelector(".b-name").textContent = e.name;
+          return li;
+        })
+      );
+    }
+    const notes = [];
+    if (board.playing) notes.push(`${board.playing} still playing`);
+    notes.push(board.final ? "Final results." : "Resets at midnight Oslo time.");
+    $("board-note").textContent = notes.join(" · ");
+  }
+
+  $("board-tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    showBoard(b.dataset.day === "today" ? dayKey() : previousKey(dayKey()));
+  });
+  $("board-rename").addEventListener("click", () => askName(() => showBoard(boardDay || dayKey())));
+  $("board-device").addEventListener("click", async () => {
+    const link = `${location.origin}${location.pathname}#player=${token()}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Link copied. Open it on your other device, and keep it to yourself!");
+    } catch (e) {
+      prompt("Open this link on your other device (keep it private):", link);
+    }
+  });
+
+  // A #player=<token> link moves this player to a new device.
+  function adoptPlayerLink() {
+    const m = location.hash.match(/^#player=([0-9a-f-]{36})$/i);
+    if (!m) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    if (m[1] === store.token) return;
+    if (store.token && !confirm("Switch this device to the player from the link? Today's progress here will follow that player.")) return;
+    store.token = m[1].toLowerCase();
+    store.name = null;
+    save();
+    toast("Player linked. Welcome back!");
+  }
+
+  // ---------------------------------------------------------------- achievements
+
+  const NYDALEN = [10.7652, 59.9494]; // Zivid HQ
+  const bannedIds = new Set(DATA.bannedIds);
+
+  const ACHIEVEMENTS = [
+    { id: "first", icon: "📸", name: "First Capture", desc: "Finish your first daily ZapTap.", check: (c) => c.stats.played >= 1 },
+    { id: "calibrated", icon: "🎯", name: "Calibrated", desc: "Score 100 on a round.", check: (c) => c.rounds.some((r) => r.s === 100) },
+    { id: "submm", icon: "🔬", name: "Sub-millimetre Accuracy", desc: "Drop a pin within 5 km of a target.", check: (c) => c.rounds.some((r) => r.km <= 5) },
+    { id: "hdr", icon: "🌈", name: "HDR Capture", desc: "Score 80+ on all five rounds of a daily.", check: (c) => c.days.some((d) => d.rounds.every((r) => r.s >= 80)) },
+    { id: "dense", icon: "☁️", name: "Dense Point Cloud", desc: "Score 900+ on a daily.", check: (c) => c.stats.best >= 900 },
+    { id: "impact", icon: "💥", name: "Make Impact", desc: "Score 90+ on both ×3 rounds of a daily.", check: (c) => c.days.some((d) => d.rounds[3].s >= 90 && d.rounds[4].s >= 90) },
+    {
+      id: "motion",
+      icon: "🦾",
+      name: "Motion Planned",
+      desc: "Score higher on every round than on the one before.",
+      check: (c) => c.games.some((g) => g.rounds.length === 5 && g.rounds.every((r, i) => i === 0 || r.s > g.rounds[i - 1].s)),
+    },
+    { id: "handeye", icon: "🤝", name: "Hand-Eye Calibrated", desc: "Score 700+ three days in a row.", check: (c) => c.runOf((d) => d.total >= 700) >= 3 },
+    { id: "bin", icon: "📦", name: "Bin Picker", desc: "Finish 10 dailies.", check: (c) => c.stats.played >= 10 },
+    { id: "depal", icon: "🏗️", name: "Depalletizer", desc: "Finish 50 dailies.", check: (c) => c.stats.played >= 50 },
+    { id: "streak7", icon: "🔁", name: "Always-On Camera", desc: "Play 7 days in a row.", check: (c) => c.stats.maxStreak >= 7 },
+    { id: "streak30", icon: "🏭", name: "Industrial Grade", desc: "Play 30 days in a row.", check: (c) => c.stats.maxStreak >= 30 },
+    {
+      id: "global",
+      icon: "🌍",
+      name: "Global Customer Base",
+      desc: "Land in the right country on six different continents.",
+      check: (c) => new Set(c.days.flatMap((d) => d.rounds.map((r, i) => r.h && continentOf(d.targets[i] && d.targets[i].id)).filter(Boolean))).size >= 6,
+    },
+    { id: "lunch", icon: "🥪", name: "Second Lunch", desc: "Finish a daily between 14:00 and 15:00.", check: (c) => c.finishedHour(14, 15) },
+    { id: "practice", icon: "🧪", name: "Lab Rig", desc: "Finish 10 practice rounds.", check: () => store.practice.played >= 10 },
+    { id: "trust", icon: "📣", name: "Build Trust", desc: "Share 5 results with the team.", check: () => store.shares >= 5 },
+    { id: "podium", icon: "🥉", name: "Podium Pick", desc: "Finish top 3 on a day's final leaderboard (3+ players).", check: (c) => c.finalRank > 0 && c.finalRank <= 3 },
+    { id: "top", icon: "🥇", name: "Top of the Pallet", desc: "Finish first on a day's final leaderboard (3+ players).", check: (c) => c.finalRank === 1 },
+    { id: "homesick", icon: "🏠", name: "Homesick", desc: "Drop a pin in a country a Zividian comes from.", secret: true, check: (c) => c.rounds.some((r) => bannedIds.has(r.c)) },
+    {
+      id: "nydalen",
+      icon: "🏢",
+      name: "Back to Nydalen",
+      desc: "Drop a pin within 25 km of the Oslo office.",
+      secret: true,
+      check: (c) => c.rounds.some((r) => d3.geoDistance(r.g, NYDALEN) * EARTH_KM <= 25),
+    },
+    { id: "artifact", icon: "👾", name: "Artifact Detected", desc: "Score 0 on a round.", secret: true, check: (c) => c.rounds.some((r) => r.s === 0) },
+    { id: "recal", icon: "🔧", name: "Needs Recalibration", desc: "Finish a daily under 300.", secret: true, check: (c) => c.days.some((d) => d.total < 300) },
+    { id: "night", icon: "🌙", name: "Night Shift", desc: "Finish a daily between midnight and 05:00.", secret: true, check: (c) => c.finishedHour(0, 5) },
+    {
+      id: "studio",
+      icon: "🎓",
+      name: "Zivid Studio Pro",
+      desc: "Unlock 12 other achievements.",
+      check: () => Object.keys(store.achievements).filter((id) => id !== "studio").length >= 12,
+    },
+  ];
+
+  function achievementContext({ game: g, board }) {
+    const stats = computeStats();
+    const days = stats.done.map(([, d]) => d);
+    const games = [...days];
+    if (g && g.mode === "practice") games.push(g);
+    let finalRank = 0;
+    if (board && board.final && board.entries.length >= 3 && store.name) {
+      finalRank = board.entries.findIndex((e) => e.name === store.name) + 1;
+    }
+    return {
+      stats,
+      days,
+      games,
+      rounds: games.flatMap((x) => x.rounds),
+      finalRank,
+      finishedHour: (from, to) => days.some((d) => d.finishedAt && new Date(d.finishedAt).getHours() >= from && new Date(d.finishedAt).getHours() < to),
+      runOf(pred) {
+        let best = 0;
+        let run = 0;
+        let prev = null;
+        for (const [key, d] of [...stats.done].reverse()) {
+          run = pred(d) ? (prev && previousKey(key) === prev ? run + 1 : 1) : 0;
+          best = Math.max(best, run);
+          prev = pred(d) ? key : null;
+        }
+        return best;
+      },
+    };
+  }
+
+  function checkAchievements(input, quiet = false) {
+    const fresh = [];
+    for (let pass = 0; pass < 2; pass++) {
+      const ctx = achievementContext(input); // recomputed: "studio" depends on the others
+      for (const a of ACHIEVEMENTS) {
+        if (store.achievements[a.id]) continue;
+        try {
+          if (!a.check(ctx)) continue;
+        } catch (e) {
+          continue;
+        }
+        store.achievements[a.id] = dayKey();
+        fresh.push(a);
+      }
+    }
+    if (!fresh.length) return;
+    save();
+    if (!quiet) for (const a of fresh) toast(`${a.icon} Achievement unlocked: ${a.name}`, 2600);
+  }
+
+  function showAchievements() {
+    const got = ACHIEVEMENTS.filter((a) => store.achievements[a.id]).length;
+    $("ach-count").textContent = `${got} of ${ACHIEVEMENTS.length} unlocked`;
+    $("ach-list").replaceChildren(
+      ...ACHIEVEMENTS.map((a) => {
+        const on = !!store.achievements[a.id];
+        const hidden = a.secret && !on;
+        const li = document.createElement("li");
+        li.className = on ? "on" : "";
+        li.innerHTML = `<span class="a-icon"></span><span><div class="a-name"></div><div class="a-desc"></div></span>`;
+        li.querySelector(".a-icon").textContent = hidden ? "❔" : a.icon;
+        li.querySelector(".a-name").textContent = hidden ? "Secret achievement" : a.name;
+        li.querySelector(".a-desc").textContent = hidden
+          ? "Keep playing to find out."
+          : on
+          ? `${a.desc} Unlocked ${prettyDate(store.achievements[a.id], { day: "numeric", month: "short" })}.`
+          : a.desc;
+        return li;
+      })
+    );
+    openSheet("achievements");
+  }
+
+  // Final leaderboards can award achievements: look at yesterday's quietly.
+  async function checkYesterdayBoard() {
+    const y = previousKey(dayKey());
+    const rec = store.days[y];
+    if (!API || !store.name || !rec || rec.rounds.length < 5) return;
+    try {
+      checkAchievements({ board: await api(`/api/leaderboard?day=${y}`) });
+    } catch (e) {
+      // Try again next visit.
+    }
+  }
+
   $("results-close").addEventListener("click", closeSheets);
   $("results-practice").addEventListener("click", startPractice);
+  $("results-board").addEventListener("click", () => showBoard(game.key));
   $("play-practice").addEventListener("click", startPractice);
   $("play-daily").addEventListener("click", startDaily);
+  $("home-board").addEventListener("click", () => showBoard());
   $("home-btn").addEventListener("click", showHome);
   $("help-btn").addEventListener("click", () => openSheet("help"));
   $("stats-btn").addEventListener("click", showStats);
+  $("board-btn").addEventListener("click", () => (API ? showBoard() : toast("The leaderboard isn't set up yet.")));
+  $("ach-btn").addEventListener("click", showAchievements);
 
   // ---------------------------------------------------------------- stats
 
@@ -837,13 +1248,32 @@
 
   // ---------------------------------------------------------------- misc
 
-  let toastTimer = 0;
-  function toast(msg) {
+  // Toasts queue up so several achievements don't overwrite each other.
+  const toasts = [];
+  let toastBusy = false;
+  function toast(msg, ms = 1800) {
+    toasts.push([msg, ms]);
+    if (!toastBusy) nextToast();
+  }
+  function nextToast() {
+    const item = toasts.shift();
     const t = $("toast");
-    t.textContent = msg;
-    t.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+    if (!item) {
+      toastBusy = false;
+      return;
+    }
+    toastBusy = true;
+    t.textContent = item[0];
+    // As a popover it sits in the top layer, above any open dialog.
+    if (t.showPopover) {
+      if (t.matches(":popover-open")) t.hidePopover();
+      t.showPopover();
+    }
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(nextToast, 250);
+    }, item[1]);
   }
 
   function renderFlags() {
@@ -857,8 +1287,10 @@
 
   // ---------------------------------------------------------------- boot
 
+  adoptPlayerLink();
   readColors();
   renderFlags();
+  checkAchievements({}, true); // backfill from history without fanfare
   if (earth) {
     earth.loadBase("earth.jpg").catch(() => console.warn("ZapTap: couldn't load earth.jpg, using vector map"));
   }
@@ -882,6 +1314,7 @@
         .then((hi) => {
           prepareGeo(hi);
           requestDraw();
+          checkYesterdayBoard();
         });
     })
     .catch(() => {

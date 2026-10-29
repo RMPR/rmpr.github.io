@@ -1,0 +1,13 @@
+name = "zaptap"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Pages allowed to call the API (comma-separated).
+ALLOWED_ORIGINS = "https://rmpr.xyz,https://www.rmpr.xyz,https://rmpr.github.io,http://localhost:4000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zaptap"
+# Paste the id printed by `npx wrangler d1 create zaptap` here.
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

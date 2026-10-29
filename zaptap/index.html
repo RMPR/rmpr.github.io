@@ -19,6 +19,12 @@
       <span>ZapTap</span>
     </button>
     <div class="bar__actions">
+      <button class="icon-btn" id="board-btn" aria-label="Leaderboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>
+      </button>
+      <button class="icon-btn" id="ach-btn" aria-label="Achievements">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m9 14.2-1.5 7.3L12 19l4.5 2.5-1.5-7.3"/></svg>
+      </button>
       <button class="icon-btn" id="stats-btn" aria-label="Statistics">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
       </button>
@@ -74,6 +80,7 @@
       <p class="muted small">The twist: nothing is ever in a country a Zividian comes from.</p>
       <div class="stack">
         <button class="btn btn--primary" id="play-daily">Play today</button>
+        <button class="btn" id="home-board">Leaderboard</button>
         <button class="btn" id="play-practice">Practice round</button>
       </div>
       <p class="muted small center" id="home-streak"></p>
@@ -85,9 +92,11 @@
     <div class="sheet__body">
       <h2 id="results-title">ZapTap</h2>
       <div class="big-score"><span id="results-total">0</span><small>/1000</small></div>
+      <p class="rank-line" id="results-rank" hidden></p>
       <ol class="rounds" id="results-rounds"></ol>
       <div class="stack">
         <button class="btn btn--primary" id="share-btn">Share result</button>
+        <button class="btn" id="results-board">Leaderboard</button>
         <button class="btn" id="results-practice">Practice round</button>
         <button class="btn btn--ghost" id="results-close">See the map</button>
       </div>
@@ -109,6 +118,50 @@
     </div>
   </dialog>
 
+  <!-- Leaderboard -->
+  <dialog class="sheet" id="board">
+    <div class="sheet__body">
+      <h2>Leaderboard</h2>
+      <div class="tabs" id="board-tabs">
+        <button data-day="today" class="on">Today</button>
+        <button data-day="yesterday">Yesterday</button>
+      </div>
+      <p class="muted small" id="board-title"></p>
+      <ol class="board" id="board-list"></ol>
+      <p class="muted small" id="board-note"></p>
+      <p class="small" id="board-me"></p>
+      <div class="stack">
+        <button class="btn" id="board-rename">Change my name</button>
+        <button class="btn" id="board-device">Play on another device</button>
+        <button class="btn btn--ghost" data-close>Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Achievements -->
+  <dialog class="sheet" id="achievements">
+    <div class="sheet__body">
+      <h2>Achievements</h2>
+      <p class="muted small" id="ach-count"></p>
+      <ul class="achievements" id="ach-list"></ul>
+      <div class="stack"><button class="btn" data-close>Close</button></div>
+    </div>
+  </dialog>
+
+  <!-- Name -->
+  <dialog class="sheet" id="name-dlg">
+    <form class="sheet__body" id="name-form">
+      <h2>Who's playing?</h2>
+      <p class="muted small">Pick the name shown on the daily leaderboard. Use the one people know you by in the channel.</p>
+      <input class="input" id="name-input" maxlength="24" autocomplete="nickname" placeholder="Your name" required>
+      <p class="error small" id="name-error"></p>
+      <div class="stack">
+        <button class="btn btn--primary" id="name-save" type="submit">Save</button>
+        <button class="btn btn--ghost" id="name-cancel" type="button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Help -->
   <dialog class="sheet" id="help">
     <div class="sheet__body">
@@ -119,7 +172,8 @@
         <li>You get 100 points for landing within 22&nbsp;km. Points drop with distance, down to 0 at 16,250&nbsp;km.</li>
         <li>Later rounds are harder and count more: ×1 ×1 ×2 ×3 ×3, for 1000 points max.</li>
         <li>Daily bonus: a pin in the right country scores at least 25, and the right continent scores at least 10.</li>
-        <li>A new ZapTap starts at your local midnight.</li>
+        <li>A new ZapTap starts at midnight Oslo time, and so does the leaderboard.</li>
+        <li>Your daily score goes on the team leaderboard under your name. There are achievements to unlock too.</li>
       </ul>
       <h3>Off-limits countries</h3>
       <p class="muted small">No place is ever in a country a Zividian comes from:</p>
@@ -129,10 +183,11 @@
     </div>
   </dialog>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+  <script src="config.js"></script>
   <script src="places.js"></script>
   <script src="earth.js"></script>
   <script src="zaptap.js"></script>

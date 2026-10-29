@@ -352,6 +352,11 @@ dialog.sheet::backdrop { background: rgba(7, 11, 22, 0.45); backdrop-filter: blu
 
 .toast {
   position: fixed;
+  inset: auto auto 90px 50%;
+  margin: 0;
+  border: 0;
+  max-width: calc(100% - 32px);
+  text-align: center;
   left: 50%;
   bottom: 90px;
   transform: translate(-50%, 20px);
@@ -370,4 +375,74 @@ dialog.sheet::backdrop { background: rgba(7, 11, 22, 0.45); backdrop-filter: blu
 @media (max-width: 520px) {
   .zoom { display: none; }
   .reveal__score { font-size: 1.7rem; }
+}
+
+/* Leaderboard */
+.rank-line { text-align: center; font-weight: 600; margin: -6px 0 14px; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.tabs button {
+  flex: 1;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabs button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.board li {
+  display: grid;
+  grid-template-columns: 2em 1fr auto 3em;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.board li.muted { display: block; }
+.board li.me { outline: 2px solid var(--accent); outline-offset: -2px; }
+.board .b-rank { text-align: center; }
+.board .b-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .b-emoji { font-size: 0.75rem; letter-spacing: -1px; }
+.board .b-total { font-family: "IBM Plex Mono", ui-monospace, monospace; text-align: right; }
+
+/* Achievements */
+.achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.achievements li {
+  display: grid;
+  grid-template-columns: 2.2em 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  opacity: 0.55;
+}
+.achievements li.on { opacity: 1; box-shadow: inset 3px 0 0 var(--accent); }
+.achievements .a-icon { font-size: 1.6rem; text-align: center; filter: grayscale(1); }
+.achievements li.on .a-icon { filter: none; }
+.achievements .a-name { font-weight: 600; }
+.achievements .a-desc { font-size: 0.85rem; color: var(--muted); }
+
+/* Name */
+.input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+.input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.error { color: var(--guess); min-height: 1.2em; margin: 6px 0 0; }
+
+@media (max-width: 400px) {
+  .bar__actions { gap: 4px; }
+  .bar .icon-btn { width: 36px; height: 36px; }
 }

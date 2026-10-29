@@ -1,7 +1,7 @@
 // Builds zaptap/places.js from GeoNames cities15000 + curated landmarks,
 // validated against the world-atlas 50m country polygons.
 //
-// Usage: node build.js <data-dir> <out-file>
+// Usage: node build.js <data-dir> <out-file> [<worker-json>]
 // <data-dir> must hold cities15000.txt (download.geonames.org/export/dump),
 // countries-50m.json (world-atlas@2.0.2) and all.csv
 // (github.com/lukes/ISO-3166-Countries-with-Regional-Codes).
@@ -13,6 +13,7 @@ const topojson = require("topojson-client");
 
 const DATA = process.argv[2];
 const OUT = process.argv[3];
+const WORKER_OUT = process.argv[4];
 
 // Zividian homelands (+ their overseas bits). ISO 3166 numeric.
 const BANNED = {
@@ -166,3 +167,5 @@ const out =
   "// Place: [name, lat, lon, tier (1 easy - 3 hard), country id, kind (c = city, l = landmark)]\n" +
   "window.ZAPTAP_DATA = " + JSON.stringify({ banned, bannedIds, countries, places }) + ";\n";
 if (OUT) fs.writeFileSync(OUT, out);
+// The Worker picks the daily puzzle server-side from the same pool.
+if (WORKER_OUT) fs.writeFileSync(WORKER_OUT, JSON.stringify({ bannedIds, countries, places }) + "\n");

@@ -85,3 +85,4 @@ exclude:
   - README.md
   - CNAME
   - zaptap/tools
+  - zaptap/worker
