@@ -117,10 +117,14 @@ function nearestCountry(lon, lat) {
 
 const places = [];
 const rejects = [];
-// Places whose border is contested: accepted if they fall in any of these
-// countries, and shown with a neutral country label.
+// Places on contested ground: kept wherever the border data puts them, and
+// shown with this label instead of a country ("" shows no country at all).
 const CONTESTED = {
-  "Jerusalem|IL": { ids: ["376", "275"], label: "Israel / Palestine" },
+  "Jerusalem|IL": "",
+  "Sevastopol|UA": "Crimea",
+  "Hargeysa|SO": "",
+  "Borama|SO": "",
+  "Nicosia|CY": "",
 };
 
 function add(name, a2, lat, lon, tier, kind, isCapital = false) {
@@ -136,9 +140,11 @@ function add(name, a2, lat, lon, tier, kind, isCapital = false) {
   let hit = countryAt(lon, lat);
   if (hit === null) hit = nearestCountry(lon, lat);
   const contested = CONTESTED[name + "|" + a2];
-  if (hit !== num && !(contested && contested.ids.includes(hit))) { rejects.push([name, a2, num, hit]); return false; }
-  const place = [name, Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4, tier, num, kind];
-  if (contested) place.push(contested.label);
+  const ok = contested === undefined ? hit === num : hit && !BANNED[hit];
+  if (!ok) { rejects.push([name, a2, num, hit]); return false; }
+  // A contested place takes the id of the shape it's in, for the country bonus.
+  const place = [name, Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4, tier, hit, kind];
+  if (contested !== undefined) place.push(contested);
   places.push(place);
   return true;
 }

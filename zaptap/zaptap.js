@@ -108,7 +108,7 @@
       usedCountries.add(pick[4]);
       const cont = DATA.countries[pick[4]][1];
       perContinent[cont] = (perContinent[cont] || 0) + 1;
-      return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: pick[6] || DATA.countries[pick[4]][0] };
+      return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: pick.length > 6 ? pick[6] : DATA.countries[pick[4]][0], contested: pick.length > 6 };
     });
   }
 
@@ -679,16 +679,17 @@
     let s = distanceScore(km);
     let b;
     const hit = countryAt(g);
+    const inCountry = hit === t.id && !t.contested; // contested places have no "right country"
     if (game.mode === "daily") {
-      if (hit === t.id && s < 25) {
+      if (inCountry && s < 25) {
         s = 25;
         b = "country";
-      } else if (hit && hit !== t.id && continentOf(hit) === continentOf(t.id) && s < 10) {
+      } else if (hit && !inCountry && continentOf(hit) === continentOf(t.id) && s < 10) {
         s = 10;
         b = "continent";
       }
     }
-    applyRound({ g, km: Math.round(km * 10) / 10, s, h: hit === t.id ? 1 : 0, b }, i);
+    applyRound({ g, km: Math.round(km * 10) / 10, s, h: inCountry ? 1 : 0, b }, i);
   }
 
   function applyRound(round, i) {
@@ -824,7 +825,7 @@
           <span><div class="r-name"></div><div class="r-sub"></div></span>
           <span class="r-score">${r.s * WEIGHTS[i]}<small>${r.s} ×${WEIGHTS[i]}</small></span>`;
         li.querySelector(".r-name").textContent = t.name;
-        li.querySelector(".r-sub").textContent = `${t.country} · ${formatKm(r.km)}`;
+        li.querySelector(".r-sub").textContent = [t.country, formatKm(r.km)].filter(Boolean).join(" · ");
         return li;
       })
     );

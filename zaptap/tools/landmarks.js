@@ -84,7 +84,6 @@ module.exports = [
   ["Bondi Beach", "AU", -33.8915, 151.2767, 2],
   ["Mount Cook / Aoraki", "NZ", -43.595, 170.1418, 3],
   ["Mecca (Masjid al-Haram)", "SA", 21.4225, 39.8262, 1],
-  ["Dome of the Rock", "IL", 31.778, 35.2354, 2],
   ["Dead Sea (Ein Bokek)", "IL", 31.2, 35.3625, 2],
   // A city, listed here so the 60 km suburb rule doesn't drop it next to Jerusalem.
   ["Tel Aviv", "IL", 32.0809, 34.7806, 3],

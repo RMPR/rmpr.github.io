@@ -94,7 +94,7 @@ function pickTargets(rand) {
     usedCountries.add(pick[4]);
     const cont = DATA.countries[pick[4]][1];
     perContinent[cont] = (perContinent[cont] || 0) + 1;
-    return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: pick[6] || DATA.countries[pick[4]][0] };
+    return { name: pick[0], lat: pick[1], lon: pick[2], id: pick[4], country: pick.length > 6 ? pick[6] : DATA.countries[pick[4]][0], contested: pick.length > 6 };
   });
 }
 
@@ -283,10 +283,11 @@ async function guess(env, player, body) {
   let score = distanceScore(km);
   let bonus = null;
   const hit = countryAt([lon, lat]);
-  if (hit === t.id && score < 25) {
+  const inCountry = hit === t.id && !t.contested; // contested places have no "right country"
+  if (inCountry && score < 25) {
     score = 25;
     bonus = "country";
-  } else if (hit && hit !== t.id && continentOf(hit) === continentOf(t.id) && score < 10) {
+  } else if (hit && !inCountry && continentOf(hit) === continentOf(t.id) && score < 10) {
     score = 10;
     bonus = "continent";
   }
@@ -297,7 +298,7 @@ async function guess(env, player, body) {
     score,
     points: score * WEIGHTS[round],
     bonus,
-    in_country: hit === t.id ? 1 : 0,
+    in_country: inCountry ? 1 : 0,
   };
   try {
     await env.DB.prepare(
