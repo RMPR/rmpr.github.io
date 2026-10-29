@@ -182,4 +182,9 @@ module.exports = [
   ["Pantanal", "BR", -17.6, -57.4, 3],
   ["Valparaíso", "CL", -33.0472, -71.6127, 2],
   ["Kaieteur Falls", "GY", 5.175, -59.48, 3],
+  ["Kruger National Park", "ZA", -23.99, 31.55, 3],
+  ["Cape of Good Hope", "ZA", -34.3568, 18.474, 3],
+  ["Český Krumlov", "CZ", 48.8127, 14.3175, 3],
+  ["Bay of Kotor", "ME", 42.4247, 18.7712, 3],
+  ["Liwa Oasis", "AE", 23.1333, 53.7667, 3],
 ];

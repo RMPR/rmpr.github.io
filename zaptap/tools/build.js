@@ -20,10 +20,10 @@ const BANNED = {
   "840": "United States", "580": "United States", "850": "United States", "316": "United States", "016": "United States", "630": "United States",
   "392": "Japan", "120": "Cameroon", "356": "India", "398": "Kazakhstan", "380": "Italy",
   "578": "Norway", "744": "Norway", "074": "Norway",
-  "040": "Austria", "688": "Serbia", "499": "Montenegro", "586": "Pakistan", "203": "Czechia",
+  "040": "Austria", "688": "Serbia", "586": "Pakistan",
   "372": "Ireland", "638": "France", "254": "France", "474": "France", "312": "France", "175": "France", "876": "France",
   "581": "United States", "156": "China", "344": "China", "446": "China", "410": "South Korea",
-  "710": "South Africa", "276": "Germany", "784": "United Arab Emirates",
+  "276": "Germany",
 };
 
 function parseCsv(text) {
