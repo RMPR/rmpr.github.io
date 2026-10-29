@@ -26,6 +26,7 @@ const BANNED = {
   "581": "United States", "156": "China", "344": "China", "446": "China", "410": "South Korea",
   "276": "Germany", "076": "Brazil", "616": "Poland", "792": "Turkey", "752": "Sweden",
   "528": "Netherlands", "533": "Netherlands", "531": "Netherlands", "534": "Netherlands", "535": "Netherlands",
+  "036": "Australia", "574": "Australia", "162": "Australia", "166": "Australia", "334": "Australia",
   "826": "United Kingdom", "831": "United Kingdom", "832": "United Kingdom", "833": "United Kingdom", "292": "United Kingdom",
   "238": "United Kingdom", "060": "United Kingdom", "136": "United Kingdom", "092": "United Kingdom", "500": "United Kingdom",
   "796": "United Kingdom", "660": "United Kingdom", "654": "United Kingdom", "612": "United Kingdom", "086": "United Kingdom", "239": "United Kingdom",
@@ -166,7 +167,7 @@ const num2a2 = Object.fromEntries(Object.entries(a2num).map(([a2, n]) => [n, a2]
 const flag = (a2) => [...a2].map((ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65)).join("");
 const banned = [];
 // Object key order puts "175" before "250", so name each country after its main id.
-const MAIN = { France: "250", "United States": "840", Norway: "578", China: "156", "United Kingdom": "826", Netherlands: "528" };
+const MAIN = { France: "250", "United States": "840", Norway: "578", China: "156", "United Kingdom": "826", Netherlands: "528", Australia: "036" };
 for (const [num, name] of Object.entries(BANNED)) {
   if (!banned.some((b) => b[0] === name)) banned.push([name, flag(num2a2[MAIN[name] || num])]);
 }
