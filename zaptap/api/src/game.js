@@ -126,7 +126,7 @@ export function puzzleFor(secret, day) {
 }
 
 export function roundView(target, i, guess) {
-  const r = { round: i, name: target.name, country: target.country, countryId: target.id, weight: WEIGHTS[i] };
+  const r = { round: i, name: target.name, country: target.country, countryId: target.id, contested: !!target.contested, weight: WEIGHTS[i] };
   if (guess) {
     Object.assign(r, {
       guess: [guess.lon, guess.lat],

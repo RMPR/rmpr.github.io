@@ -119,6 +119,9 @@ a { color: inherit; }
 #globe {
   touch-action: none;
   cursor: crosshair;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 #globe.dragging { cursor: grabbing; }
 

@@ -126,6 +126,7 @@
   let topoHi = null;
   let topoLo = null;
   let countryShapes = []; // { id, feature, bounds }
+  const shapesById = new Map(); // id -> features (some countries have several)
 
   // Vector land, only drawn while the satellite texture loads or without WebGL2.
   const drawable = (topo) => ({ land: topojson.feature(topo, topo.objects.land) });
@@ -138,6 +139,10 @@
       feature: f,
       bounds: d3.geoBounds(f),
     }));
+    for (const c of countryShapes) {
+      if (!shapesById.has(c.id)) shapesById.set(c.id, []);
+      shapesById.get(c.id).push(c.feature);
+    }
   }
 
   function inBounds([[w, s], [e, n]], [lon, lat]) {
@@ -330,6 +335,25 @@
     ctx.closePath();
   }
 
+  const EQUATOR = { type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]] };
+
+  // Outline the answer's country once it's revealed. Contested places have no
+  // country to show, just the pin.
+  function drawCountry(t) {
+    const shapes = !t.contested && shapesById.get(t.id);
+    if (!shapes) return;
+    ctx.beginPath();
+    for (const f of shapes) geoPath(f);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = colors.answer;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = colors.answer;
+    ctx.stroke();
+  }
+
   function drawArc(a, b, color) {
     ctx.beginPath();
     geoPath({ type: "LineString", coordinates: [a, b] });
@@ -356,6 +380,15 @@
       drawVectorGlobe();
     }
 
+    // The equator, as a thin dashed line.
+    ctx.beginPath();
+    geoPath(EQUATOR);
+    ctx.setLineDash([8, 6]);
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(255, 210, 63, 0.75)";
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     // Overlays
     if (game) {
       const shown = game.phase === "done" ? game.rounds.map((r, i) => [r, game.targets[i]]) : [];
@@ -363,11 +396,13 @@
         const i = game.rounds.length - 1;
         shown.push([game.rounds[i], game.targets[i]]);
       }
+      for (const [, t] of shown) drawCountry(t);
       for (const [r, t] of shown) drawArc(r.g, [t.lon, t.lat], "#fff");
       for (const [r] of shown) drawPin(r.g, colors.guess);
       for (const [, t] of shown) drawPin([t.lon, t.lat], colors.answer, t.name);
-      if (game.phase === "guess" && pending) drawPin(pending, colors.guess);
+      if ((game.phase === "guess" || game.phase === "checking") && pending) drawPin(pending, colors.guess);
     }
+    drawHold();
   }
 
   function drawVectorGlobe() {
@@ -446,7 +481,9 @@
     }
     if (pointers.size === 1) {
       gesture = { start: localPoint(e), lon: view.lon, lat: view.lat, moved: false, multi: false, t: performance.now() };
+      startHold(localPoint(e));
     } else if (pointers.size === 2) {
+      cancelHold();
       const [p, q] = [...pointers.values()];
       gesture = { ...gesture, multi: true, pinch: Math.hypot(p[0] - q[0], p[1] - q[1]), zoom: view.zoom };
     }
@@ -465,6 +502,7 @@
       const dy = y - gesture.start[1];
       if (!gesture.moved && Math.hypot(dx, dy) < 6) return;
       gesture.moved = true;
+      cancelHold(); // it's a drag, not a press
       canvas.classList.add("dragging");
       const degPerPx = 180 / Math.PI / (baseRadius * view.zoom);
       view.lon = gesture.lon - dx * degPerPx;
@@ -480,6 +518,7 @@
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
     canvas.classList.remove("dragging");
+    cancelHold(); // let go before the ring filled up
     if (pointers.size === 0 && gesture) {
       const g = gesture;
       gesture = null;
@@ -499,6 +538,7 @@
     "wheel",
     (e) => {
       e.preventDefault();
+      cancelHold();
       view.zoom = clampZoom(view.zoom * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
       markInteracting();
       requestDraw();
@@ -513,16 +553,106 @@
   $("zoom-in").addEventListener("click", () => zoomBy(1.8));
   $("zoom-out").addEventListener("click", () => zoomBy(1 / 1.8));
 
-  function onTap([x, y]) {
-    if (!game || game.phase !== "guess") return;
-    const r = Math.hypot(x - W / 2, y - centerY());
-    if (r > baseRadius * view.zoom) return;
+  // Long press to guess: keep still on a spot and a ring fills up; when it's
+  // full the guess is locked in. Moving, a second finger or letting go early
+  // cancels it, so dragging and pinching the globe work as before.
+  const HOLD_DELAY = 250; // ms before the ring shows, so drags don't flash it
+  const HOLD_FILL = 900; // ms for the ring to fill
+  const FLASH_MS = 450;
+  let hold = null; // { x, y, lonlat, start }
+  let flash = null; // { x, y, start }
+  let holdTimer = null;
+
+  function globePoint([x, y]) {
+    if (Math.hypot(x - W / 2, y - centerY()) > baseRadius * view.zoom) return null;
     const lonlat = projection.invert([x, y]);
-    if (!lonlat || Number.isNaN(lonlat[0])) return;
-    pending = lonlat;
-    setAction("Confirm guess", true);
+    return lonlat && !Number.isNaN(lonlat[0]) ? lonlat : null;
+  }
+
+  function startHold(p) {
+    if (!game || game.phase !== "guess") return;
+    const lonlat = globePoint(p);
+    if (!lonlat) return;
+    hold = { x: p[0], y: p[1], lonlat, start: performance.now() };
+    runHoldTimer();
+  }
+
+  function cancelHold() {
+    if (!hold) return;
+    hold = null;
     requestDraw();
   }
+
+  function runHoldTimer() {
+    if (holdTimer) return;
+    holdTimer = d3.timer(() => {
+      const now = performance.now();
+      if (hold && now - hold.start >= HOLD_DELAY + HOLD_FILL) {
+        flash = { x: hold.x, y: hold.y, start: now };
+        pending = hold.lonlat;
+        hold = null;
+        if (navigator.vibrate) navigator.vibrate(30);
+        confirmGuess();
+      }
+      if (flash && now - flash.start > FLASH_MS) flash = null;
+      if (!hold && !flash) {
+        holdTimer.stop();
+        holdTimer = null;
+      }
+      requestDraw();
+    });
+  }
+
+  function drawHold() {
+    const now = performance.now();
+    const R = 26;
+    if (hold) {
+      const k = Math.min(1, (now - hold.start - HOLD_DELAY) / HOLD_FILL);
+      if (k > 0) {
+        const a0 = -Math.PI / 2;
+        const a1 = a0 + k * 2 * Math.PI;
+        ctx.beginPath();
+        ctx.arc(hold.x, hold.y, R, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(6, 10, 24, 0.25)";
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(hold.x, hold.y, R, a0, a1);
+        ctx.lineWidth = 4.5;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#ffd23f";
+        ctx.stroke();
+        ctx.lineCap = "butt";
+        ctx.beginPath();
+        ctx.arc(hold.x + R * Math.cos(a1), hold.y + R * Math.sin(a1), 3.5, 0, 2 * Math.PI);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
+    }
+    if (flash) {
+      const k = Math.min(1, (now - flash.start) / FLASH_MS);
+      ctx.beginPath();
+      ctx.arc(flash.x, flash.y, R + 18 * k, 0, 2 * Math.PI);
+      ctx.globalAlpha = 1 - k;
+      ctx.lineWidth = 5 - 3 * k;
+      ctx.strokeStyle = colors.answer;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // A quick tap only explains how to guess.
+  let tapHintShown = false;
+  function onTap(p) {
+    if (!game || game.phase !== "guess" || !globePoint(p) || tapHintShown) return;
+    tapHintShown = true;
+    toast("Press and hold to drop your guess");
+  }
+
+  // Long presses shouldn't open the browser's context menu or text callout.
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // ---------------------------------------------------------------- server
 
@@ -609,6 +739,7 @@
     id: r.countryId,
     lon: r.answer ? r.answer[0] : undefined,
     lat: r.answer ? r.answer[1] : undefined,
+    contested: !!r.contested,
   });
   const roundFrom = (r) => ({ g: r.guess, km: r.km, s: r.score, h: r.inCountry ? 1 : 0, b: r.bonus || undefined });
 
@@ -636,7 +767,7 @@
     $("running-total").textContent = runningTotal();
     $("place-name").textContent = t.name;
     $("place-country").textContent = t.country;
-    setAction("Tap the globe to guess", false);
+    setAction("Press and hold on the globe to guess", false);
     animateTo({ lon: view.lon, lat: Math.max(-35, Math.min(45, view.lat)), zoom: 1 }, 600);
     requestDraw();
   }
@@ -665,7 +796,7 @@
           return startDaily();
         }
         toast("Couldn't reach the server. Try again.");
-        setAction("Confirm guess", true);
+        setAction("Send guess again", true);
         return;
       }
       Object.assign(t, targetFrom(res.result));
