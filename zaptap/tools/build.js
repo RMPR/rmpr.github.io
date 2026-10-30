@@ -28,7 +28,7 @@ const BANNED = {
   "276": "Germany", "076": "Brazil", "616": "Poland", "792": "Turkey", "752": "Sweden",
   "528": "Netherlands", "533": "Netherlands", "531": "Netherlands", "534": "Netherlands", "535": "Netherlands",
   "036": "Australia", "574": "Australia", "162": "Australia", "166": "Australia", "334": "Australia",
-  "144": "Sri Lanka", "246": "Finland", "248": "Finland",
+  "144": "Sri Lanka", "246": "Finland", "248": "Finland", "620": "Portugal",
   "826": "United Kingdom", "831": "United Kingdom", "832": "United Kingdom", "833": "United Kingdom", "292": "United Kingdom",
   "238": "United Kingdom", "060": "United Kingdom", "136": "United Kingdom", "092": "United Kingdom", "500": "United Kingdom",
   "796": "United Kingdom", "660": "United Kingdom", "654": "United Kingdom", "612": "United Kingdom", "086": "United Kingdom", "239": "United Kingdom",
