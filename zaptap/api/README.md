@@ -52,6 +52,36 @@ App settings (set by the script):
 | `SEED_SECRET` | Picks the daily puzzles. Generated once; never change it, or today's puzzle changes under people's feet. |
 | `ZAPTAP_STORAGE` | Storage account connection string. |
 | `ALLOWED_EMAIL_DOMAIN` | Who may play. |
+| `TEAMS_WEBHOOK_URL` | Optional: the Teams Workflow URL for the daily results post (see below). Treat it like a password. |
+
+## Daily results in Teams
+
+At 16:00 Oslo time on working days (not weekends, Norwegian public holidays,
+Christmas Eve or New Year's Eve), today's leaderboard is posted to a Teams
+chat: whoever finished by then, best first. It never names today's places.
+
+How it fits together:
+
+- A Teams Workflow made from the "Send webhook alerts to a chat" template
+  gives a URL that posts what it receives into the chat.
+- `POST /api/report` builds the leaderboard card and sends it there, once it's
+  due and at most once a day. It needs no key and takes no input: calling it
+  early, late or repeatedly does nothing beyond sending that one post.
+- `.github/workflows/zaptap-daily-results.yml` calls it at 14:00 and 15:00 UTC
+  on weekdays (16:00 Oslo in summer and winter); the API works out which run
+  is the real one. GitHub only runs scheduled workflows from the default
+  branch, so the workflow must be on `master`.
+
+Setup:
+
+1. Static Web App → **Settings → Environment variables**: add
+   `TEAMS_WEBHOOK_URL` (the Workflow URL).
+2. GitHub repository → **Settings → Secrets and variables → Actions →
+   Variables**: add `ZAPTAP_URL` with the site's address
+   (`https://<name>.azurestaticapps.net`).
+3. The first post comes at 16:00 on the next working day. Each run's log
+   (**Actions → ZapTap daily results**) shows the answer, e.g.
+   `{"posted":false,"reason":"too_early"}` for the 15:00 run in summer.
 
 ## Updating places
 
@@ -69,3 +99,4 @@ All endpoints need a signed-in Zivid account.
 | POST | `/api/name` | `{name}` | the new display name, or `409 name_taken` |
 | GET | `/api/leaderboard?day=YYYY-MM-DD` | | finished games for that day, best first |
 | GET | `/config.js` | | rewritten to `/api/config`: tells the page it's online |
+| POST | `/api/report` | | posts today's results to Teams if due and not yet done; no player needed |
