@@ -4,14 +4,17 @@
 //
 // Imagery is NASA Blue Marble (public domain): a bundled 4K base texture,
 // plus detail tiles streamed from NASA GIBS when zoomed in. Blue Marble only
-// paints the sea and the largest lakes flat blue; a MODIS water mask for each
-// (bundled, and streamed alongside the detail tiles) marks rivers and other
-// lakes too, so all water gets the same colour.
+// paints the deep sea and the largest lakes flat blue. An inland water mask
+// (bundled, and built from GIBS tiles alongside the detail tiles) marks rivers
+// and other lakes too, so they get the same colour; shallow seas keep theirs.
 (() => {
   "use strict";
 
   const GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/BlueMarble_ShadedRelief/default/500m";
-  const WATER = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/MODIS_Water_Mask/default/250m"; // same grid
+  // Same grid as the imagery. Inland water = MODIS water inside OSM land.
+  const WATER = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/MODIS_Water_Mask/default/250m";
+  const LAND = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/OSM_Land_Mask/default/250m";
+  const COAST_PX = 2; // how far in from the coast inland water starts
   const TILE = 512;
   const MAX_LEVEL = 7; // ~500 m per pixel
   const MIN_DETAIL_LEVEL = 4; // below this the base texture is as sharp
@@ -247,17 +250,35 @@ void main() {
       }
     }
 
-    const tile = document.createElement("canvas");
-    tile.width = tile.height = TILE;
-    const t2 = tile.getContext("2d");
-    function whiten(img) {
-      t2.globalCompositeOperation = "copy";
-      t2.drawImage(img, 0, 0);
-      t2.globalCompositeOperation = "source-in";
-      t2.fillStyle = "#fff";
-      t2.fillRect(0, 0, TILE, TILE);
-      t2.globalCompositeOperation = "source-over";
-      return tile;
+    const layer = (width, height) => {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      return [c, c.getContext("2d")];
+    };
+
+    // Inland water from the stitched masks (both opaque where they say
+    // water/land): MODIS water where OSM has land, with the land shrunk a
+    // little first, as the two don't put coastlines in quite the same place
+    // and the sliver would outline every coast. White on black, for the red
+    // channel. Done on the whole stitched area so tile edges don't erode.
+    function inlandWater(water, land) {
+      const { width, height } = water;
+      const [inner, i2] = layer(width, height);
+      i2.drawImage(land, 0, 0);
+      i2.globalCompositeOperation = "destination-in";
+      for (const [dx, dy] of [[-COAST_PX, 0], [COAST_PX, 0], [0, -COAST_PX], [0, COAST_PX]]) i2.drawImage(land, dx, dy);
+      const [out, o2] = layer(width, height);
+      o2.drawImage(water, 0, 0);
+      o2.globalCompositeOperation = "destination-in";
+      o2.drawImage(inner, 0, 0);
+      o2.globalCompositeOperation = "source-in";
+      o2.fillStyle = "#fff";
+      o2.fillRect(0, 0, width, height);
+      o2.globalCompositeOperation = "destination-over";
+      o2.fillStyle = "#000";
+      o2.fillRect(0, 0, width, height);
+      return out;
     }
 
     function loadDetail(key, { z, span, cols, x0, y0, nx, ny }) {
@@ -267,14 +288,8 @@ void main() {
       const c2 = canvas2.getContext("2d");
       c2.fillStyle = "rgb(2,5,20)";
       c2.fillRect(0, 0, canvas2.width, canvas2.height);
-      // The mask tiles are cyan water on transparent land: turn each into
-      // white on black, so the red channel says how much is water.
-      const water = document.createElement("canvas");
-      water.width = canvas2.width;
-      water.height = canvas2.height;
-      const w2 = water.getContext("2d");
-      w2.fillStyle = "#000";
-      w2.fillRect(0, 0, water.width, water.height);
+      const [water, w2] = layer(canvas2.width, canvas2.height);
+      const [land, l2] = layer(canvas2.width, canvas2.height);
       const jobs = [];
       const masks = [];
       for (let j = 0; j < ny; j++) {
@@ -284,7 +299,8 @@ void main() {
             loadImage(`${GIBS}/${z}/${y0 + j}/${col}.jpeg`).then((img) => c2.drawImage(img, i * TILE, j * TILE))
           );
           masks.push(
-            loadImage(`${WATER}/${z}/${y0 + j}/${col}.png`).then((img) => w2.drawImage(whiten(img), i * TILE, j * TILE))
+            loadImage(`${WATER}/${z}/${y0 + j}/${col}.png`).then((img) => w2.drawImage(img, i * TILE, j * TILE)),
+            loadImage(`${LAND}/${z}/${y0 + j}/${col}.png`).then((img) => l2.drawImage(img, i * TILE, j * TILE))
           );
         }
       }
@@ -292,7 +308,7 @@ void main() {
         if (key !== wantedKey) return; // the view moved on
         if (results.slice(0, jobs.length).every((r) => r.status === "rejected")) return;
         upload(1, detailTex, canvas2, RGB);
-        upload(3, detailWaterTex, water, MASK);
+        upload(3, detailWaterTex, inlandWater(water, land), MASK);
         detailBox = [x0 * span - 180, 90 - y0 * span, nx * span, ny * span];
         detailKey = key;
         detailOn = true;
