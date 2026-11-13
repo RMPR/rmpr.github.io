@@ -4,9 +4,10 @@
 //
 // Imagery is NASA Blue Marble (public domain): a bundled 4K base texture,
 // plus detail tiles streamed from NASA GIBS when zoomed in. Blue Marble only
-// paints the deep sea and the largest lakes flat blue. An inland water mask
-// (bundled, and built from GIBS tiles alongside the detail tiles) marks rivers
-// and other lakes too, so they get the same colour; shallow seas keep theirs.
+// paints the deep sea and the largest lakes flat blue. A water mask (bundled,
+// and built from GIBS tiles alongside the detail tiles) marks inland water
+// (rivers, other lakes) and the sea: inland water and dark sea get the deep
+// sea's colour, bright shallows (the Bahamas banks) keep theirs.
 (() => {
   "use strict";
 
@@ -32,7 +33,7 @@ uniform vec2 uRot;      // centre lon, lat (radians)
 uniform float uGlow;    // halo width, device px
 uniform sampler2D uBase;
 uniform sampler2D uDetail;
-uniform sampler2D uBaseWater;   // red = water
+uniform sampler2D uBaseWater;   // red = inland water, green = sea
 uniform sampler2D uDetailWater;
 uniform vec4 uBox;      // detail box: lon min, lat max, lon span, lat span (radians)
 uniform float uDetailOn;
@@ -66,7 +67,7 @@ void main() {
   vec2 bdx = vec2(gLon.x / (2.0 * PI), -gLat.x / PI);
   vec2 bdy = vec2(gLon.y / (2.0 * PI), -gLat.y / PI);
   vec3 col = textureGrad(uBase, uv, bdx, bdy).rgb;
-  float mask = textureGrad(uBaseWater, uv, bdx, bdy).r;
+  vec2 mask = textureGrad(uBaseWater, uv, bdx, bdy).rg;
 
   if (uDetailOn > 0.5) {
     float dl = mod(lon - uBox.x, 2.0 * PI);
@@ -83,14 +84,21 @@ void main() {
     float dy = uWaterBox.y - lat;
     if (dl < uWaterBox.z && dy >= 0.0 && dy <= uWaterBox.w) {
       mask = textureGrad(uDetailWater, vec2(dl / uWaterBox.z, dy / uWaterBox.w),
-                         vec2(gLon.x / uWaterBox.z, -gLat.x / uWaterBox.w), vec2(gLon.y / uWaterBox.z, -gLat.y / uWaterBox.w)).r;
+                         vec2(gLon.x / uWaterBox.z, -gLat.x / uWaterBox.w), vec2(gLon.y / uWaterBox.z, -gLat.y / uWaterBox.w)).rg;
     }
   }
 
-  // Water is either Blue Marble's flat near-black sea or anything the water
-  // mask marks (rivers, lakes): paint it all one brighter navy.
-  float sea = 1.0 - smoothstep(0.035, 0.11, distance(col, vec3(0.008, 0.02, 0.078)));
-  float water = max(sea, mask);
+  // Water to paint one brighter navy: Blue Marble's flat near-black sea, inland
+  // water from the mask, and sea that's dark in the photo. Near-black seas
+  // (murky ones like the Persian Gulf) go everywhere; the dark teal haze
+  // Blue Marble has over Arctic seas (the Barents Sea) only beyond about 60
+  // degrees, as the darker parts of tropical shallows are just as dark and
+  // should keep their colour along with the bright turquoise.
+  float flatSea = 1.0 - smoothstep(0.035, 0.11, distance(col, vec3(0.008, 0.02, 0.078)));
+  float brightness = max(col.r, max(col.g, col.b));
+  float polar = smoothstep(radians(55.0), radians(62.0), abs(lat));
+  float darkSea = mask.g * (1.0 - smoothstep(mix(0.11, 0.17, polar), mix(0.16, 0.27, polar), brightness));
+  float water = max(max(flatSea, mask.r), darkSea);
   vec3 landCol = pow(col, vec3(0.86)) * 1.12;
   col = mix(landCol, uOcean, water);
 
@@ -159,9 +167,9 @@ void main() {
     const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const aniso = gl.getExtension("EXT_texture_filter_anisotropic");
 
-    // Imagery is RGB; water masks are single-channel (R8, red = water).
+    // Imagery is RGB; water masks are two channels (red = inland, green = sea).
     const RGB = { internal: gl.RGB8, format: gl.RGB, empty: [2, 5, 20] };
-    const MASK = { internal: gl.R8, format: gl.RED, empty: [0] };
+    const MASK = { internal: gl.RG8, format: gl.RG, empty: [0, 0] };
 
     function makeTexture(unit, wrapS, kind) {
       const tex = gl.createTexture();
@@ -273,24 +281,34 @@ void main() {
       return [c, c.getContext("2d")];
     };
 
-    // Inland water from the stitched masks (both opaque where they say
-    // water/land): MODIS water where OSM has land, with the land shrunk a
-    // little first, as the two don't put coastlines in quite the same place
-    // and the sliver would outline every coast. White on black, for the red
-    // channel. Done on the whole stitched area so tile edges don't erode.
-    function inlandWater(water, land) {
+    // The water mask from the stitched masks (both opaque where they say
+    // water/land), done on the whole area so tile edges don't erode:
+    // - red, inland water: MODIS water where OSM has land, the land shrunk a
+    //   little first, as the two don't put coastlines in quite the same place
+    //   and the sliver would outline every coast;
+    // - green, sea: where OSM has no land, kept a pixel off the coast.
+    function waterMask(water, land) {
       const { width, height } = water;
       const [inner, i2] = layer(width, height);
       i2.drawImage(land, 0, 0);
       i2.globalCompositeOperation = "destination-in";
       for (const [dx, dy] of [[-COAST_PX, 0], [COAST_PX, 0], [0, -COAST_PX], [0, COAST_PX]]) i2.drawImage(land, dx, dy);
+      const [outer, g2] = layer(width, height);
+      for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) g2.drawImage(land, dx, dy);
+      const [sea, s2] = layer(width, height);
+      s2.fillStyle = "#0f0";
+      s2.fillRect(0, 0, width, height);
+      s2.globalCompositeOperation = "destination-out";
+      s2.drawImage(outer, 0, 0);
       const [out, o2] = layer(width, height);
       o2.drawImage(water, 0, 0);
       o2.globalCompositeOperation = "destination-in";
       o2.drawImage(inner, 0, 0);
       o2.globalCompositeOperation = "source-in";
-      o2.fillStyle = "#fff";
+      o2.fillStyle = "#f00";
       o2.fillRect(0, 0, width, height);
+      o2.globalCompositeOperation = "lighter";
+      o2.drawImage(sea, 0, 0);
       o2.globalCompositeOperation = "destination-over";
       o2.fillStyle = "#000";
       o2.fillRect(0, 0, width, height);
@@ -404,13 +422,15 @@ void main() {
           const at = `${mz}/${my0 + j}/${col}.png`;
           masks.push(
             tile(`${WATER}/${at}`).then((img) => img && w2.drawImage(img, i * TILE, j * TILE)),
-            tile(`${LAND}/${at}`).then((img) => img && l2.drawImage(img, i * TILE, j * TILE))
+            // A land tile that failed counts as all land, so a network hiccup
+            // can't turn a forest into sea.
+            tile(`${LAND}/${at}`).then((img) => (img ? l2.drawImage(img, i * TILE, j * TILE) : l2.fillRect(i * TILE, j * TILE, TILE, TILE)))
           );
         }
       }
       Promise.all(masks).then(() => {
         if (current !== job) return;
-        job.waterReady = { canvas: inlandWater(water, land), box: [mx0 * mspan - 180, 90 - my0 * mspan, mnx * mspan, mny * mspan] };
+        job.waterReady = { canvas: waterMask(water, land), box: [mx0 * mspan - 180, 90 - my0 * mspan, mnx * mspan, mny * mspan] };
         scheduleFlush(job, imagery, box);
       });
     }

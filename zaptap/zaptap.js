@@ -1399,7 +1399,7 @@
   renderFlags();
   checkAchievements({}, true); // backfill from history without fanfare
   if (earth) {
-    earth.loadBase("earth.webp", "earth-water.png").catch(() => console.warn("ZapTap: couldn't load earth.webp, using vector map"));
+    earth.loadBase("earth.webp", "earth-water.webp").catch(() => console.warn("ZapTap: couldn't load earth.webp, using vector map"));
   }
   window.addEventListener("resize", resize);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
