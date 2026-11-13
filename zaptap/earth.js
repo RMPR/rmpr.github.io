@@ -3,11 +3,15 @@
 // the 2D overlay (pins, arcs) and tap inversion stay in d3.
 //
 // Imagery is NASA Blue Marble (public domain): a bundled 4K base texture,
-// plus detail tiles streamed from NASA GIBS when zoomed in.
+// plus detail tiles streamed from NASA GIBS when zoomed in. Blue Marble only
+// paints the sea and the largest lakes flat blue; a MODIS water mask for each
+// (bundled, and streamed alongside the detail tiles) marks rivers and other
+// lakes too, so all water gets the same colour.
 (() => {
   "use strict";
 
   const GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/BlueMarble_ShadedRelief/default/500m";
+  const WATER = "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/MODIS_Water_Mask/default/250m"; // same grid
   const TILE = 512;
   const MAX_LEVEL = 7; // ~500 m per pixel
   const MIN_DETAIL_LEVEL = 4; // below this the base texture is as sharp
@@ -25,6 +29,8 @@ uniform vec2 uRot;      // centre lon, lat (radians)
 uniform float uGlow;    // halo width, device px
 uniform sampler2D uBase;
 uniform sampler2D uDetail;
+uniform sampler2D uBaseWater;   // red = water
+uniform sampler2D uDetailWater;
 uniform vec4 uBox;      // detail box: lon min, lat max, lon span, lat span (radians)
 uniform float uDetailOn;
 uniform vec3 uOcean;
@@ -52,21 +58,29 @@ void main() {
   vec2 gLat = vec2(dFdx(lat), dFdy(lat));
 
   vec2 uv = vec2((lon + PI) / (2.0 * PI), (0.5 * PI - lat) / PI);
-  vec3 col = textureGrad(uBase, uv, vec2(gLon.x / (2.0 * PI), -gLat.x / PI), vec2(gLon.y / (2.0 * PI), -gLat.y / PI)).rgb;
+  vec2 bdx = vec2(gLon.x / (2.0 * PI), -gLat.x / PI);
+  vec2 bdy = vec2(gLon.y / (2.0 * PI), -gLat.y / PI);
+  vec3 col = textureGrad(uBase, uv, bdx, bdy).rgb;
+  float mask = textureGrad(uBaseWater, uv, bdx, bdy).r;
 
   if (uDetailOn > 0.5) {
     float dl = mod(lon - uBox.x, 2.0 * PI);
     float dy = uBox.y - lat;
     if (dl < uBox.z && dy >= 0.0 && dy <= uBox.w) {
-      col = textureGrad(uDetail, vec2(dl / uBox.z, dy / uBox.w),
-                        vec2(gLon.x / uBox.z, -gLat.x / uBox.w), vec2(gLon.y / uBox.z, -gLat.y / uBox.w)).rgb;
+      vec2 duv = vec2(dl / uBox.z, dy / uBox.w);
+      vec2 ddx = vec2(gLon.x / uBox.z, -gLat.x / uBox.w);
+      vec2 ddy = vec2(gLon.y / uBox.z, -gLat.y / uBox.w);
+      col = textureGrad(uDetail, duv, ddx, ddy).rgb;
+      mask = textureGrad(uDetailWater, duv, ddx, ddy).r;
     }
   }
 
-  // Blue Marble's ocean is a flat near-black blue: swap it for a brighter navy.
-  float land = smoothstep(0.035, 0.11, distance(col, vec3(0.008, 0.02, 0.078)));
+  // Water is either Blue Marble's flat near-black sea or anything the water
+  // mask marks (rivers, lakes): paint it all one brighter navy.
+  float sea = 1.0 - smoothstep(0.035, 0.11, distance(col, vec3(0.008, 0.02, 0.078)));
+  float water = max(sea, mask);
   vec3 landCol = pow(col, vec3(0.86)) * 1.12;
-  col = mix(uOcean, landCol, land);
+  col = mix(landCol, uOcean, water);
 
   // Soft limb darkening and a thin atmosphere rim.
   col *= 0.7 + 0.3 * pow(xp, 0.5);
@@ -121,17 +135,23 @@ void main() {
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     const u = {};
-    for (const name of ["uCenter", "uRadius", "uRot", "uGlow", "uBase", "uDetail", "uBox", "uDetailOn", "uOcean"]) {
+    for (const name of ["uCenter", "uRadius", "uRot", "uGlow", "uBase", "uDetail", "uBaseWater", "uDetailWater", "uBox", "uDetailOn", "uOcean"]) {
       u[name] = gl.getUniformLocation(prog, name);
     }
     gl.uniform1i(u.uBase, 0);
     gl.uniform1i(u.uDetail, 1);
+    gl.uniform1i(u.uBaseWater, 2);
+    gl.uniform1i(u.uDetailWater, 3);
     gl.uniform3f(u.uOcean, 10 / 255, 34 / 255, 104 / 255);
 
     const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const aniso = gl.getExtension("EXT_texture_filter_anisotropic");
 
-    function makeTexture(unit, wrapS) {
+    // Imagery is RGB; water masks are single-channel (R8, red = water).
+    const RGB = { internal: gl.RGB8, format: gl.RGB, empty: [2, 5, 20] };
+    const MASK = { internal: gl.R8, format: gl.RED, empty: [0] };
+
+    function makeTexture(unit, wrapS, kind) {
       const tex = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -140,16 +160,19 @@ void main() {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       if (aniso) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([2, 5, 20]));
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, kind.internal, 1, 1, 0, kind.format, gl.UNSIGNED_BYTE, new Uint8Array(kind.empty));
       return tex;
     }
-    const baseTex = makeTexture(0, gl.REPEAT);
-    const detailTex = makeTexture(1, gl.CLAMP_TO_EDGE);
+    const baseTex = makeTexture(0, gl.REPEAT, RGB);
+    const detailTex = makeTexture(1, gl.CLAMP_TO_EDGE, RGB);
+    const baseWaterTex = makeTexture(2, gl.REPEAT, MASK);
+    const detailWaterTex = makeTexture(3, gl.CLAMP_TO_EDGE, MASK);
 
-    function upload(unit, tex, source) {
+    function upload(unit, tex, source, kind) {
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, gl.RGB, gl.UNSIGNED_BYTE, source);
+      gl.texImage2D(gl.TEXTURE_2D, 0, kind.internal, kind.format, gl.UNSIGNED_BYTE, source);
       gl.generateMipmap(gl.TEXTURE_2D);
     }
 
@@ -159,9 +182,16 @@ void main() {
     let detailKey = "";
     let wantedKey = "";
 
-    function loadBase(url) {
+    function loadBase(url, waterUrl) {
+      // Without the mask the globe still works, rivers just keep their photo colour.
+      loadImage(waterUrl)
+        .then((img) => {
+          upload(2, baseWaterTex, img, MASK);
+          onChange();
+        })
+        .catch(() => console.warn("ZapTap: couldn't load " + waterUrl));
       return loadImage(url).then((img) => {
-        upload(0, baseTex, img);
+        upload(0, baseTex, img, RGB);
         baseReady = true;
         onChange();
       });
@@ -217,6 +247,19 @@ void main() {
       }
     }
 
+    const tile = document.createElement("canvas");
+    tile.width = tile.height = TILE;
+    const t2 = tile.getContext("2d");
+    function whiten(img) {
+      t2.globalCompositeOperation = "copy";
+      t2.drawImage(img, 0, 0);
+      t2.globalCompositeOperation = "source-in";
+      t2.fillStyle = "#fff";
+      t2.fillRect(0, 0, TILE, TILE);
+      t2.globalCompositeOperation = "source-over";
+      return tile;
+    }
+
     function loadDetail(key, { z, span, cols, x0, y0, nx, ny }) {
       const canvas2 = document.createElement("canvas");
       canvas2.width = nx * TILE;
@@ -224,19 +267,32 @@ void main() {
       const c2 = canvas2.getContext("2d");
       c2.fillStyle = "rgb(2,5,20)";
       c2.fillRect(0, 0, canvas2.width, canvas2.height);
+      // The mask tiles are cyan water on transparent land: turn each into
+      // white on black, so the red channel says how much is water.
+      const water = document.createElement("canvas");
+      water.width = canvas2.width;
+      water.height = canvas2.height;
+      const w2 = water.getContext("2d");
+      w2.fillStyle = "#000";
+      w2.fillRect(0, 0, water.width, water.height);
       const jobs = [];
+      const masks = [];
       for (let j = 0; j < ny; j++) {
         for (let i = 0; i < nx; i++) {
           const col = (((x0 + i) % cols) + cols) % cols;
           jobs.push(
             loadImage(`${GIBS}/${z}/${y0 + j}/${col}.jpeg`).then((img) => c2.drawImage(img, i * TILE, j * TILE))
           );
+          masks.push(
+            loadImage(`${WATER}/${z}/${y0 + j}/${col}.png`).then((img) => w2.drawImage(whiten(img), i * TILE, j * TILE))
+          );
         }
       }
-      Promise.allSettled(jobs).then((results) => {
+      Promise.allSettled([...jobs, ...masks]).then((results) => {
         if (key !== wantedKey) return; // the view moved on
-        if (results.every((r) => r.status === "rejected")) return;
-        upload(1, detailTex, canvas2);
+        if (results.slice(0, jobs.length).every((r) => r.status === "rejected")) return;
+        upload(1, detailTex, canvas2, RGB);
+        upload(3, detailWaterTex, water, MASK);
         detailBox = [x0 * span - 180, 90 - y0 * span, nx * span, ny * span];
         detailKey = key;
         detailOn = true;
