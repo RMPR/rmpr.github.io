@@ -1,6 +1,6 @@
 """Builds ZapTap's base globe textures from NASA GIBS (public domain):
 
-  ../earth.jpg        Blue Marble shaded relief, 4096 x 2048
+  ../earth.webp       Blue Marble shaded relief, 4096 x 2048
   ../earth-water.png  inland water (lakes, rivers), 4096 x 2048, grey (255 =
                       water); the globe paints it the colour of the sea
 
@@ -48,7 +48,7 @@ def mosaic(template, mode, convert):
 def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).parent.parent)
     imagery = mosaic(IMAGERY, "RGB", lambda t: t.convert("RGB"))
-    imagery.resize(SIZE, Image.LANCZOS).save(out / "earth.jpg", quality=84, optimize=True, progressive=True)
+    imagery.resize(SIZE, Image.LANCZOS).save(out / "earth.webp", quality=80, method=6)
     # Each mask is its opaque part. Averaging when shrinking keeps rivers
     # thinner than a pixel as partial water instead of losing them.
     alpha = lambda t: t.convert("RGBA").getchannel("A")
