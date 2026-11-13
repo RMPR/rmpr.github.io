@@ -36,6 +36,8 @@ uniform sampler2D uBaseWater;   // red = water
 uniform sampler2D uDetailWater;
 uniform vec4 uBox;      // detail box: lon min, lat max, lon span, lat span (radians)
 uniform float uDetailOn;
+uniform vec4 uWaterBox; // same for the detail water mask
+uniform float uWaterOn;
 uniform vec3 uOcean;
 out vec4 outColor;
 const float PI = 3.141592653589793;
@@ -74,7 +76,14 @@ void main() {
       vec2 ddx = vec2(gLon.x / uBox.z, -gLat.x / uBox.w);
       vec2 ddy = vec2(gLon.y / uBox.z, -gLat.y / uBox.w);
       col = textureGrad(uDetail, duv, ddx, ddy).rgb;
-      mask = textureGrad(uDetailWater, duv, ddx, ddy).r;
+    }
+  }
+  if (uWaterOn > 0.5) {
+    float dl = mod(lon - uWaterBox.x, 2.0 * PI);
+    float dy = uWaterBox.y - lat;
+    if (dl < uWaterBox.z && dy >= 0.0 && dy <= uWaterBox.w) {
+      mask = textureGrad(uDetailWater, vec2(dl / uWaterBox.z, dy / uWaterBox.w),
+                         vec2(gLon.x / uWaterBox.z, -gLat.x / uWaterBox.w), vec2(gLon.y / uWaterBox.z, -gLat.y / uWaterBox.w)).r;
     }
   }
 
@@ -138,7 +147,7 @@ void main() {
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     const u = {};
-    for (const name of ["uCenter", "uRadius", "uRot", "uGlow", "uBase", "uDetail", "uBaseWater", "uDetailWater", "uBox", "uDetailOn", "uOcean"]) {
+    for (const name of ["uCenter", "uRadius", "uRot", "uGlow", "uBase", "uDetail", "uBaseWater", "uDetailWater", "uBox", "uDetailOn", "uWaterBox", "uWaterOn", "uOcean"]) {
       u[name] = gl.getUniformLocation(prog, name);
     }
     gl.uniform1i(u.uBase, 0);
@@ -180,20 +189,25 @@ void main() {
     }
 
     let baseReady = false;
+    let baseImg = null;
+    let baseWaterImg = null;
     let detailOn = false;
     let detailBox = [0, 0, 1, 1];
+    let waterOn = false;
+    let waterBox = [0, 0, 1, 1];
     let detailKey = "";
-    let wantedKey = "";
 
     function loadBase(url, waterUrl) {
       // Without the mask the globe still works, rivers just keep their photo colour.
       loadImage(waterUrl)
         .then((img) => {
+          baseWaterImg = img;
           upload(2, baseWaterTex, img, MASK);
           onChange();
         })
         .catch(() => console.warn("ZapTap: couldn't load " + waterUrl));
       return loadImage(url).then((img) => {
+        baseImg = img;
         upload(0, baseTex, img, RGB);
         baseReady = true;
         onChange();
@@ -217,6 +231,8 @@ void main() {
       gl.uniform1f(u.uGlow, 16 * dpr);
       gl.uniform4f(u.uBox, detailBox[0] * rad, detailBox[1] * rad, detailBox[2] * rad, detailBox[3] * rad);
       gl.uniform1f(u.uDetailOn, detailOn ? 1 : 0);
+      gl.uniform4f(u.uWaterBox, waterBox[0] * rad, waterBox[1] * rad, waterBox[2] * rad, waterBox[3] * rad);
+      gl.uniform1f(u.uWaterOn, waterOn ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
@@ -236,16 +252,16 @@ void main() {
         const ny = y1 - y0 + 1;
         if (nx * ny > MAX_TILES || nx * TILE > maxTex || ny * TILE > maxTex) continue;
         const key = [z, x0, y0, nx, ny].join("/");
-        if (key === detailKey || key === wantedKey) return;
-        wantedKey = key;
+        if (key === detailKey) return;
+        detailKey = key;
         loadDetail(key, { z, span, cols, x0, y0, nx, ny });
         return;
       }
       // Zoomed out: the base texture is enough.
-      wantedKey = "";
-      if (detailOn) {
-        detailOn = false;
-        detailKey = "";
+      detailKey = "";
+      current = null;
+      if (detailOn || waterOn) {
+        detailOn = waterOn = false;
         onChange();
       }
     }
@@ -281,39 +297,148 @@ void main() {
       return out;
     }
 
+    // ---------------------------------------------------------------- tiles
+
+    // Recently used tiles, decoded off the main thread where the browser can,
+    // shared by every update: panning back or a little only fetches what's new.
+    const CACHE_MAX = 96; // about 1 MB each, decoded
+    const cache = new Map(); // url -> Promise of a decoded image, or null if it failed
+    const decoded = new Map(); // url -> decoded image, once ready
+
+    function decode(url) {
+      if (!window.createImageBitmap) return loadImage(url);
+      return fetch(url, { mode: "cors" })
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+        .then((blob) => createImageBitmap(blob));
+    }
+
+    function tile(url) {
+      let p = cache.get(url);
+      if (p) {
+        cache.delete(url); // most recently used goes last
+      } else {
+        p = decode(url).then(
+          (img) => {
+            if (cache.get(url) !== p) {
+              if (img.close) img.close(); // evicted while it was downloading
+              return null;
+            }
+            decoded.set(url, img);
+            return img;
+          },
+          () => null
+        );
+      }
+      cache.set(url, p);
+      while (cache.size > CACHE_MAX) {
+        const old = cache.keys().next().value;
+        const img = decoded.get(old);
+        cache.delete(old);
+        decoded.delete(old);
+        if (img && img.close) img.close();
+      }
+      return p;
+    }
+
+    // ---------------------------------------------------------------- detail
+
+    // The detail area shows straight away, filled from the base image plus
+    // any tiles already cached, and sharpens as the rest arrive. Water masks
+    // come one zoom level coarser (4x fewer tiles) and never hold up the
+    // imagery; until they're in, the base water mask is used.
+    let current = null;
+
     function loadDetail(key, { z, span, cols, x0, y0, nx, ny }) {
-      const canvas2 = document.createElement("canvas");
-      canvas2.width = nx * TILE;
-      canvas2.height = ny * TILE;
-      const c2 = canvas2.getContext("2d");
-      c2.fillStyle = "rgb(2,5,20)";
-      c2.fillRect(0, 0, canvas2.width, canvas2.height);
-      const [water, w2] = layer(canvas2.width, canvas2.height);
-      const [land, l2] = layer(canvas2.width, canvas2.height);
-      const jobs = [];
-      const masks = [];
+      const job = { key, dirty: false, waterReady: null, timer: 0 };
+      current = job;
+
+      const [imagery, c2] = layer(nx * TILE, ny * TILE);
+      const box = [x0 * span - 180, 90 - y0 * span, nx * span, ny * span];
+      const fromBase = (img, ctx, w, h, x, y, s, dx, dy, size) =>
+        img && ctx.drawImage(img, (x * s * w) / 360, (y * s * h) / 180, (s * w) / 360, (s * h) / 180, dx, dy, size, size);
+
+      let drawn = 0;
+      const pending = [];
       for (let j = 0; j < ny; j++) {
         for (let i = 0; i < nx; i++) {
           const col = (((x0 + i) % cols) + cols) % cols;
-          jobs.push(
-            loadImage(`${GIBS}/${z}/${y0 + j}/${col}.jpeg`).then((img) => c2.drawImage(img, i * TILE, j * TILE))
-          );
+          const url = `${GIBS}/${z}/${y0 + j}/${col}.jpeg`;
+          tile(url); // touch, so this view's tiles stay cached
+          const ready = decoded.get(url);
+          if (ready) {
+            c2.drawImage(ready, i * TILE, j * TILE);
+            drawn++;
+          } else {
+            fromBase(baseImg, c2, baseImg && baseImg.width, baseImg && baseImg.height, col, y0 + j, span, i * TILE, j * TILE, TILE);
+            pending.push([url, i, j]);
+          }
+        }
+      }
+      for (const [url, i, j] of pending) {
+        tile(url).then((img) => {
+          if (!img || current !== job) return;
+          c2.drawImage(img, i * TILE, j * TILE);
+          job.dirty = true;
+          scheduleFlush(job, imagery, box);
+        });
+      }
+      if (drawn) {
+        job.dirty = true;
+        flush(job, imagery, box);
+      }
+
+      // Water, one level coarser.
+      const mz = z - 1;
+      const mspan = span * 2;
+      const mcols = Math.round(360 / mspan);
+      const mx0 = Math.floor(x0 / 2);
+      const my0 = Math.floor(y0 / 2);
+      const mnx = Math.min(mcols, Math.floor((x0 + nx - 1) / 2) - mx0 + 1);
+      const mny = Math.floor((y0 + ny - 1) / 2) - my0 + 1;
+      const [water, w2] = layer(mnx * TILE, mny * TILE);
+      const [land, l2] = layer(mnx * TILE, mny * TILE);
+      const masks = [];
+      for (let j = 0; j < mny; j++) {
+        for (let i = 0; i < mnx; i++) {
+          const col = (((mx0 + i) % mcols) + mcols) % mcols;
+          const at = `${mz}/${my0 + j}/${col}.png`;
           masks.push(
-            loadImage(`${WATER}/${z}/${y0 + j}/${col}.png`).then((img) => w2.drawImage(img, i * TILE, j * TILE)),
-            loadImage(`${LAND}/${z}/${y0 + j}/${col}.png`).then((img) => l2.drawImage(img, i * TILE, j * TILE))
+            tile(`${WATER}/${at}`).then((img) => img && w2.drawImage(img, i * TILE, j * TILE)),
+            tile(`${LAND}/${at}`).then((img) => img && l2.drawImage(img, i * TILE, j * TILE))
           );
         }
       }
-      Promise.allSettled([...jobs, ...masks]).then((results) => {
-        if (key !== wantedKey) return; // the view moved on
-        if (results.slice(0, jobs.length).every((r) => r.status === "rejected")) return;
-        upload(1, detailTex, canvas2, RGB);
-        upload(3, detailWaterTex, inlandWater(water, land), MASK);
-        detailBox = [x0 * span - 180, 90 - y0 * span, nx * span, ny * span];
-        detailKey = key;
-        detailOn = true;
-        onChange();
+      Promise.all(masks).then(() => {
+        if (current !== job) return;
+        job.waterReady = { canvas: inlandWater(water, land), box: [mx0 * mspan - 180, 90 - my0 * mspan, mnx * mspan, mny * mspan] };
+        scheduleFlush(job, imagery, box);
       });
+    }
+
+    // Uploads are batched, so a burst of tiles costs one texture upload.
+    function scheduleFlush(job, imagery, box) {
+      if (job.timer) return;
+      job.timer = setTimeout(() => {
+        job.timer = 0;
+        flush(job, imagery, box);
+      }, 150);
+    }
+
+    function flush(job, imagery, box) {
+      if (current !== job) return;
+      if (job.dirty) {
+        job.dirty = false;
+        upload(1, detailTex, imagery, RGB);
+        detailBox = box;
+        detailOn = true;
+      }
+      if (job.waterReady) {
+        upload(3, detailWaterTex, job.waterReady.canvas, MASK);
+        waterBox = job.waterReady.box;
+        waterOn = true;
+        job.waterReady = null;
+      }
+      onChange();
     }
 
     return {
