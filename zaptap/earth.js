@@ -99,7 +99,9 @@ void main() {
   float polar = smoothstep(radians(55.0), radians(62.0), abs(lat));
   float darkSea = mask.g * (1.0 - smoothstep(mix(0.11, 0.17, polar), mix(0.16, 0.27, polar), brightness));
   float water = max(max(flatSea, mask.r), darkSea);
-  vec3 landCol = pow(col, vec3(0.86)) * 1.12;
+  // A gentle curve that deepens shadows a little more than highlights, so the
+  // photo's hill shading reads as relief instead of being washed out.
+  vec3 landCol = pow(col, vec3(1.25)) * 1.3;
   col = mix(landCol, uOcean, water);
 
   // Soft limb darkening and a thin atmosphere rim.
