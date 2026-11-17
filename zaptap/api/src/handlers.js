@@ -175,11 +175,15 @@ async function report() {
   if (!process.env.TEAMS_WEBHOOK_URL) throw new HttpError(503, "report_not_configured");
   const { day, due, reason } = reportDue();
   if (!due) return { posted: false, day, reason };
-  if (await store.reportSent(day)) return { posted: false, day, reason: "already_posted" };
-  const board = await leaderboard(day);
-  await sendToTeams(reportCard(board));
-  await store.markReportSent(day);
-  return { posted: true, day, finished: board.entries.length };
+  if (!(await store.claimReport(day))) return { posted: false, day, reason: "already_posted" };
+  try {
+    const board = await leaderboard(day);
+    await sendToTeams(reportCard(board));
+    return { posted: true, day, finished: board.entries.length };
+  } catch (e) {
+    await store.releaseReport(day);
+    throw e;
+  }
 }
 
 // ---------------------------------------------------------------- http
