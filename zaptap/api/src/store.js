@@ -105,16 +105,23 @@ export async function insertGuess(day, id, round, g) {
 
 // ---------------------------------------------------------------- reports
 
-export async function reportSent(day) {
+// Claims a day's post before it's sent, so two calls at the same moment
+// can't both post; false if it's already claimed.
+export async function claimReport(day) {
   try {
-    await (await table("reports")).getEntity("r", day);
+    await (await table("reports")).createEntity({ partitionKey: "r", rowKey: day, postedAt: Date.now() });
     return true;
   } catch (e) {
-    if (notFound(e)) return false;
+    if (conflict(e)) return false;
     throw e;
   }
 }
 
-export async function markReportSent(day) {
-  await (await table("reports")).upsertEntity({ partitionKey: "r", rowKey: day, postedAt: Date.now() }, "Replace");
+// Gives the claim back when sending failed, so a later call can post.
+export async function releaseReport(day) {
+  try {
+    await (await table("reports")).deleteEntity("r", day);
+  } catch (e) {
+    if (!notFound(e)) throw e;
+  }
 }

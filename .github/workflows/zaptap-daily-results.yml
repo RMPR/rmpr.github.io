@@ -1,11 +1,13 @@
 # Posts the ZapTap leaderboard to Teams at 16:00 Oslo time on working days.
 #
-# One run a weekday at 12:37 UTC (13:37 Oslo in winter, 14:37 in summer):
-# off the hour, when GitHub is least busy, and early, because GitHub can
-# start scheduled runs hours late. A run that starts before 16:00 Oslo time
-# waits until then; a late one posts straight away. The API decides the
-# rest: it only posts from 16:00 Oslo time, skips weekends and Norwegian
-# holidays, and never posts twice the same day.
+# GitHub can start scheduled runs hours late, so this tries every hour of the
+# working day, at :23 past (GitHub is busiest on the hour). A run that starts
+# in the hour before 16:00 Oslo time waits until then, so the post goes out
+# at 16:00 when GitHub is on time; otherwise the first run to start after
+# 16:00 posts. The API decides the rest: it only posts from 16:00 Oslo time,
+# skips weekends and Norwegian holidays, and posts at most once a day. A
+# scheduled run with nothing to post (too early, already posted, day off)
+# cancels itself, so in the Actions list only the run that posted is green.
 #
 # Needs, in the repository settings (Settings > Secrets and variables > Actions):
 #   variable ZAPTAP_URL  the site, e.g. https://<name>.azurestaticapps.net
@@ -15,32 +17,38 @@ name: ZapTap daily results
 
 on:
   schedule:
-    - cron: "37 12 * * 1-5"
+    - cron: "23 7-17 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: write # to cancel its own run when there's nothing to post
 
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 90
     steps:
-      - name: Wait for 16:00 in Oslo
+      - name: Wait for 16:00 in Oslo, if it's less than an hour away
         if: github.event_name == 'schedule'
         run: |
           wait=$(( $(TZ=Europe/Oslo date -d "16:00:30" +%s) - $(date +%s) ))
-          # Over 3.5 h means GitHub started us after midnight: nothing to wait for.
-          if [ "$wait" -gt 0 ] && [ "$wait" -lt 12600 ]; then
+          if [ "$wait" -gt 0 ] && [ "$wait" -lt 3600 ]; then
             echo "Waiting $((wait / 60)) minutes"
             sleep "$wait"
           fi
       - name: Ask ZapTap to post today's results
         env:
           ZAPTAP_URL: ${{ vars.ZAPTAP_URL }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$ZAPTAP_URL" ]; then
             echo "::error::Set the ZAPTAP_URL variable in the repository settings."
             exit 1
           fi
-          curl -sS --fail-with-body --retry 3 --retry-all-errors --max-time 60 -X POST "${ZAPTAP_URL%/}/api/report"
-          echo
+          res=$(curl -sS --fail-with-body --retry 3 --retry-all-errors --max-time 60 -X POST "${ZAPTAP_URL%/}/api/report")
+          echo "$res"
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(jq -r .posted <<<"$res")" != true ]; then
+            echo "Nothing to post ($(jq -r .reason <<<"$res")): cancelling this run."
+            gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+            sleep 60 # the cancellation lands while we wait
+          fi
