@@ -1,11 +1,11 @@
 # Posts the ZapTap leaderboard to Teams at 16:00 Oslo time on working days.
 #
-# GitHub starts scheduled runs late, sometimes by hours (6-9 h has been
-# seen), so this tries every hour of the working day. The API decides: it
-# only posts at 16:00 or later Oslo time, skips weekends and Norwegian
-# holidays, and never posts twice the same day. So the first run to start
-# after 16:00 posts, and every other run does nothing. Runs are at :23 past
-# the hour, as GitHub is busiest on the hour.
+# One run a weekday at 12:37 UTC (13:37 Oslo in winter, 14:37 in summer):
+# off the hour, when GitHub is least busy, and early, because GitHub can
+# start scheduled runs hours late. A run that starts before 16:00 Oslo time
+# waits until then; a late one posts straight away. The API decides the
+# rest: it only posts from 16:00 Oslo time, skips weekends and Norwegian
+# holidays, and never posts twice the same day.
 #
 # Needs, in the repository settings (Settings > Secrets and variables > Actions):
 #   variable ZAPTAP_URL  the site, e.g. https://<name>.azurestaticapps.net
@@ -15,7 +15,7 @@ name: ZapTap daily results
 
 on:
   schedule:
-    - cron: "23 7-17 * * 1-5"
+    - cron: "37 12 * * 1-5"
   workflow_dispatch:
 
 permissions: {}
@@ -23,7 +23,17 @@ permissions: {}
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
+      - name: Wait for 16:00 in Oslo
+        if: github.event_name == 'schedule'
+        run: |
+          wait=$(( $(TZ=Europe/Oslo date -d "16:00:30" +%s) - $(date +%s) ))
+          # Over 3.5 h means GitHub started us after midnight: nothing to wait for.
+          if [ "$wait" -gt 0 ] && [ "$wait" -lt 12600 ]; then
+            echo "Waiting $((wait / 60)) minutes"
+            sleep "$wait"
+          fi
       - name: Ask ZapTap to post today's results
         env:
           ZAPTAP_URL: ${{ vars.ZAPTAP_URL }}

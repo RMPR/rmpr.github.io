@@ -68,11 +68,11 @@ How it fits together:
 - `POST /api/report` builds the leaderboard card and sends it there, once it's
   due and at most once a day. It needs no key and takes no input: calling it
   early, late or repeatedly does nothing beyond sending that one post.
-- `.github/workflows/zaptap-daily-results.yml` calls it every hour of the
-  working day (:23 past, 07-17 UTC, weekdays), because GitHub starts
-  scheduled runs late, sometimes by hours. The first run after 16:00 Oslo time
-  posts; the others do nothing. GitHub only runs scheduled workflows from the
-  default branch, so the workflow must be on `master`.
+- `.github/workflows/zaptap-daily-results.yml` runs once a weekday at 12:37
+  UTC, early because GitHub can start scheduled runs hours late. If it starts
+  before 16:00 Oslo time it waits until then; if it starts later it calls
+  straight away. GitHub only runs scheduled workflows from the default
+  branch, so the workflow must be on `master`.
 
 Setup:
 
