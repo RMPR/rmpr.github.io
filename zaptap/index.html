@@ -131,7 +131,6 @@
       <p class="muted small" id="board-note"></p>
       <p class="small" id="board-me"></p>
       <div class="stack">
-        <button class="btn" id="board-rename">Change my name</button>
         <button class="btn btn--ghost" data-close>Close</button>
       </div>
     </div>
@@ -147,20 +146,6 @@
     </div>
   </dialog>
 
-  <!-- Name -->
-  <dialog class="sheet" id="name-dlg">
-    <form class="sheet__body" id="name-form">
-      <h2>Your name</h2>
-      <p class="muted small">This is the name the daily leaderboard shows. It starts as your Microsoft account name; use whatever people know you by in the channel.</p>
-      <input class="input" id="name-input" maxlength="24" autocomplete="nickname" placeholder="Your name" required>
-      <p class="error small" id="name-error"></p>
-      <div class="stack">
-        <button class="btn btn--primary" id="name-save" type="submit">Save</button>
-        <button class="btn btn--ghost" id="name-cancel" type="button">Cancel</button>
-      </div>
-    </form>
-  </dialog>
-
   <!-- Help -->
   <dialog class="sheet" id="help">
     <div class="sheet__body">
@@ -172,7 +157,8 @@
         <li>Later rounds are harder and count more: ×1 ×1 ×2 ×3 ×3, for 1000 points max.</li>
         <li>Daily bonus: a pin in the right country scores at least 25, and the right continent scores at least 10.</li>
         <li>A new ZapTap starts at midnight Oslo time, and so does the leaderboard.</li>
-        <li>Your daily score goes on the team leaderboard under your name. There are achievements to unlock too.</li>
+        <li>Your daily score goes on the team leaderboard under your Microsoft account name. There are achievements to unlock too.</li>
+        <li>You get one practice round a day, with random places that don't count.</li>
       </ul>
       <h3>Off-limits countries</h3>
       <p class="muted small">No place is ever in a country a Zividian comes from:</p>
