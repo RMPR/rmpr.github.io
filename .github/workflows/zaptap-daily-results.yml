@@ -1,9 +1,11 @@
 # Posts the ZapTap leaderboard to Teams at 16:00 Oslo time on working days.
 #
-# GitHub schedules run in UTC, so this fires at both 14:00 and 15:00 UTC
-# (16:00 Oslo in summer and in winter). The API decides whether it's time:
-# it only posts at 16:00 or later Oslo time, skips weekends and Norwegian
-# holidays, and never posts twice the same day.
+# GitHub starts scheduled runs late, sometimes by hours (6-9 h has been
+# seen), so this tries every hour of the working day. The API decides: it
+# only posts at 16:00 or later Oslo time, skips weekends and Norwegian
+# holidays, and never posts twice the same day. So the first run to start
+# after 16:00 posts, and every other run does nothing. Runs are at :23 past
+# the hour, as GitHub is busiest on the hour.
 #
 # Needs, in the repository settings (Settings > Secrets and variables > Actions):
 #   variable ZAPTAP_URL  the site, e.g. https://<name>.azurestaticapps.net
@@ -13,8 +15,7 @@ name: ZapTap daily results
 
 on:
   schedule:
-    - cron: "0 14 * * 1-5"
-    - cron: "0 15 * * 1-5"
+    - cron: "23 7-17 * * 1-5"
   workflow_dispatch:
 
 permissions: {}

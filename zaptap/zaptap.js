@@ -743,7 +743,20 @@
   });
   const roundFrom = (r) => ({ g: r.guess, km: r.km, s: r.score, h: r.inCountry ? 1 : 0, b: r.bonus || undefined });
 
+  // One practice game a day; starting one uses it up.
+  const practiceUsed = () => store.practice.day === dayKey();
+  function showPracticeButtons() {
+    for (const id of ["play-practice", "results-practice"]) {
+      $(id).disabled = practiceUsed();
+      $(id).textContent = practiceUsed() ? "Practice used today" : "Practice round";
+    }
+  }
+
   function startPractice() {
+    if (practiceUsed()) return;
+    store.practice.day = dayKey();
+    save();
+    showPracticeButtons();
     const targets = pickTargets(mulberry32((Math.random() * 2 ** 32) >>> 0));
     game = { mode: "practice", targets, rounds: [], phase: "guess" };
     closeSheets();
@@ -914,7 +927,7 @@
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheets));
   document.querySelectorAll("dialog").forEach((d) =>
     d.addEventListener("click", (e) => {
-      if (e.target === d && d.id !== "name-dlg") d.close(); // backdrop
+      if (e.target === d) d.close(); // backdrop
     })
   );
 
@@ -927,6 +940,7 @@
     else if (rec && rec.rounds.length > 0) play.textContent = `Resume today (round ${rec.rounds.length + 1} / 5)`;
     else play.textContent = "Play today";
     $("home-board").hidden = !ONLINE;
+    showPracticeButtons();
     const st = computeStats();
     const bits = [];
     if (ONLINE && store.name) bits.push(`Playing as ${store.name}`);
@@ -960,6 +974,7 @@
       })
     );
     $("results-board").hidden = !(daily && ONLINE);
+    showPracticeButtons();
     $("results-rank").hidden = true;
     openSheet("results");
     tickCountdown();
@@ -1025,43 +1040,6 @@
     countdownTimer = setTimeout(tickCountdown, 1000);
   }
 
-  // ---------------------------------------------------------------- name
-
-  let afterName = null;
-  function askName(then) {
-    afterName = then;
-    $("name-input").value = store.name || "";
-    $("name-error").textContent = "";
-    openSheet("name-dlg");
-    setTimeout(() => $("name-input").focus(), 50);
-  }
-
-  $("name-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = $("name-input").value.trim();
-    if (!name) return;
-    const btn = $("name-save");
-    btn.disabled = true;
-    try {
-      const res = await api("/api/name", { name });
-      store.name = res.name;
-      save();
-      closeSheets();
-      const then = afterName;
-      afterName = null;
-      if (then) then();
-    } catch (err) {
-      $("name-error").textContent =
-        err.code === "name_taken" ? "Someone already uses that name. Try another one." : err.code === "bad_name" ? "Use 1 to 24 characters." : "Couldn't reach the server. Try again.";
-    } finally {
-      btn.disabled = false;
-    }
-  });
-  $("name-cancel").addEventListener("click", () => {
-    afterName = null;
-    closeSheets();
-  });
-
   // ---------------------------------------------------------------- leaderboard
 
   let boardDay = null;
@@ -1073,7 +1051,6 @@
     $("board-list").innerHTML = `<li class="muted">Loading…</li>`;
     $("board-note").textContent = "";
     $("board-me").textContent = store.name ? `You're playing as ${store.name}.` : "Play today's ZapTap to get on the board.";
-    $("board-rename").hidden = !store.name;
     if (!$("board").open) openSheet("board");
     let board;
     try {
@@ -1115,7 +1092,6 @@
     if (!b) return;
     showBoard(b.dataset.day === "today" ? dayKey() : previousKey(dayKey()));
   });
-  $("board-rename").addEventListener("click", () => askName(() => showBoard(boardDay || dayKey())));
 
   // ---------------------------------------------------------------- achievements
 

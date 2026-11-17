@@ -22,8 +22,9 @@ lets any Microsoft account reach the pages themselves, which are just the
 public game; locking those to the Zivid tenant too needs the Standard plan and
 a custom Entra ID provider.
 
-Players are keyed by a SHA-256 of their email. Their display name starts as
-the Microsoft account name and can be changed in the game; names are unique.
+Players are keyed by a SHA-256 of their email. Their display name is their
+Microsoft account name and can't be changed in the game; names are unique, so
+a second person with the same account name gets " 2" added.
 
 ## Deploy
 
@@ -67,10 +68,11 @@ How it fits together:
 - `POST /api/report` builds the leaderboard card and sends it there, once it's
   due and at most once a day. It needs no key and takes no input: calling it
   early, late or repeatedly does nothing beyond sending that one post.
-- `.github/workflows/zaptap-daily-results.yml` calls it at 14:00 and 15:00 UTC
-  on weekdays (16:00 Oslo in summer and winter); the API works out which run
-  is the real one. GitHub only runs scheduled workflows from the default
-  branch, so the workflow must be on `master`.
+- `.github/workflows/zaptap-daily-results.yml` calls it every hour of the
+  working day (:23 past, 07-17 UTC, weekdays), because GitHub starts
+  scheduled runs late, sometimes by hours. The first run after 16:00 Oslo time
+  posts; the others do nothing. GitHub only runs scheduled workflows from the
+  default branch, so the workflow must be on `master`.
 
 Setup:
 
@@ -96,7 +98,6 @@ All endpoints need a signed-in Zivid account.
 | --- | --- | --- | --- |
 | POST | `/api/state` | `{}` | today's played rounds (with answers) and the next place |
 | POST | `/api/guess` | `{day, round, lon, lat}` | the scored round, its answer, and the next place |
-| POST | `/api/name` | `{name}` | the new display name, or `409 name_taken` |
 | GET | `/api/leaderboard?day=YYYY-MM-DD` | | finished games for that day, best first |
 | GET | `/config.js` | | rewritten to `/api/config`: tells the page it's online |
 | POST | `/api/report` | | posts today's results to Teams if due and not yet done; no player needed |

@@ -53,16 +53,26 @@ function defaultName(who) {
   return cleanName(local.split(/[._-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")) || "Zividian";
 }
 
-// Players are keyed by a hash of their email; the first visit creates them
-// with a unique display name they can change later.
+// Players are keyed by a hash of their email. Their name is their Microsoft
+// account's and can't be changed in the game; two people with the same
+// account name get " 2", " 3"... added, as names are unique.
+const numbered = (base, n) => (n === 1 ? base : `${base.slice(0, 21)} ${n}`);
+function isNumbered(name, base) {
+  const prefix = base.slice(0, 21) + " ";
+  return name === base || (name.startsWith(prefix) && /^\d+$/.test(name.slice(prefix.length)));
+}
+
 async function playerFor(headers) {
   const who = principal(headers);
   const id = sha256Hex(who.email);
-  const existing = await store.getPlayer(id);
-  if (existing) return { id, name: existing.name, nameKey: existing.nameKey };
   const base = defaultName(who);
+  const existing = await store.getPlayer(id);
+  if (existing) {
+    if (isNumbered(existing.name, base)) return { id, name: existing.name, nameKey: existing.nameKey };
+    return renameTo(id, existing, base); // a name picked back when that was allowed
+  }
   for (let n = 1; n < 100; n++) {
-    const name = n === 1 ? base : `${base.slice(0, 21)} ${n}`;
+    const name = numbered(base, n);
     if (!(await store.claimName(name.toLowerCase(), id))) continue;
     if (!(await store.createPlayer(id, name))) {
       await store.releaseName(name.toLowerCase()); // a parallel request created the player first
@@ -122,18 +132,16 @@ async function guess(player, body) {
   };
 }
 
-async function setName(player, body) {
-  const name = cleanName(body.name);
-  if (!name) throw new HttpError(400, "bad_name");
-  const key = name.toLowerCase();
-  if (key !== player.nameKey) {
-    if (!(await store.claimName(key, player.id))) throw new HttpError(409, "name_taken");
-    await store.renamePlayer(player.id, name);
-    await store.releaseName(player.nameKey);
-  } else {
-    await store.renamePlayer(player.id, name); // only the capitalisation changed
+async function renameTo(id, player, base) {
+  for (let n = 1; n < 100; n++) {
+    const name = numbered(base, n);
+    const key = name.toLowerCase();
+    if (!(await store.claimName(key, id))) continue;
+    await store.renamePlayer(id, name);
+    if (player.nameKey !== key) await store.releaseName(player.nameKey);
+    return { id, name, nameKey: key };
   }
-  return { name };
+  return { id, name: player.name, nameKey: player.nameKey }; // keep the old one rather than fail
 }
 
 async function leaderboard(day) {
@@ -194,7 +202,6 @@ export async function handle({ method, path, headers, query, body }) {
     }
     if (method === "POST" && path === "state") return json(await state(player));
     if (method === "POST" && path === "guess") return json(await guess(player, body || {}));
-    if (method === "POST" && path === "name") return json(await setName(player, body || {}));
     throw new HttpError(404, "not_found");
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status);
