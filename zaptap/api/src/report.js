@@ -7,6 +7,9 @@ import { osloHour, today } from "./game.js";
 
 export const POST_HOUR = 16;
 
+// Fixed here rather than taken from the request, since anyone may call /api/report.
+const SITE_URL = "https://blue-moss-08af6c903.2.azurestaticapps.net/";
+
 // Whether today's post is due now: a working day, 16:00 or later in Oslo.
 export function reportDue(now = new Date()) {
   const day = today(now);
@@ -40,6 +43,7 @@ export function reportCard(board) {
     const who = board.playing === 1 ? "1 person" : `${board.playing} people`;
     body.push({ type: "TextBlock", text: `${who} started but didn't finish in time.`, isSubtle: true, wrap: true });
   }
+  body.push({ type: "TextBlock", text: `Play today's [ZapTap](${SITE_URL})`, wrap: true });
   const card = { $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.4", body };
   return { type: "message", attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", contentUrl: null, content: card }] };
 }
