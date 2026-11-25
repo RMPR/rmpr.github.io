@@ -1006,7 +1006,8 @@
     const head = daily ? `ZapTap #${dayNumber(game.key)} ⚡ ${runningTotal()}/1000` : `ZapTap practice ⚡ ${runningTotal()}/1000`;
     const line = game.rounds.map((r) => scoreEmoji(r.s) + r.s).join(" ");
     const rank = daily && myRank && myRank.day === game.key ? `\n${medal(myRank.rank)} ${ordinal(myRank.rank)} of ${myRank.of} so far` : "";
-    return `${head}\n${line}${rank}\n${location.host}${location.pathname}`;
+    // The full address, https:// included, so chat apps make it a link.
+    return `${head}\n${line}${rank}\n${location.origin}${location.pathname}`;
   }
 
   $("share-btn").addEventListener("click", async () => {
